@@ -1,0 +1,15 @@
+digraph G {
+    // Eerste cyclus
+    A -> A [label="0"];
+    A -> B [label="1"];
+    B -> C [label="2"];
+    C -> A [label="3"];
+    
+    // Tweede cyclus
+    C -> D [label="4"];
+    D -> E [label="5"];
+    E -> D [label="6"];
+    
+    // Losse overgang
+    E -> F [label="7"];
+}

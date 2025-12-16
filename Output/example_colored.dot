@@ -1,0 +1,17 @@
+digraph G {
+rankdir=LR;
+A [style=filled, fillcolor=lightyellow, label=A];
+B [style=filled, fillcolor=lightyellow, label=B];
+C [style=filled, fillcolor=lightyellow, label=C];
+D [style=filled, fillcolor=lightgreen, label=D];
+E [style=filled, fillcolor=lightgreen, label=E];
+F [style=filled, fillcolor=lightblue, label=F];
+A -> A [label="0"];
+A -> B [label="1"];
+B -> C [label="2"];
+C -> A [label="3"];
+C -> D [label="4"];
+D -> E [label="5"];
+E -> D [label="6"];
+E -> F [label="7"];
+}
