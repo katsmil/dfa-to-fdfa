@@ -45,7 +45,7 @@ def sccs_are_isomorphic(G1: nx.DiGraph, G2: nx.DiGraph) -> bool:
 
 
 def main():
-    G = load_graph("Input/example.dot")
+    G = load_graph("Input/example2.dot")
 
     sccs = compute_scc_subgraphs(G)
 

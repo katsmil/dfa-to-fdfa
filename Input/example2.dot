@@ -1,0 +1,27 @@
+digraph G {
+  rankdir=LR;
+  __start0 [label="" shape=none width=0 height=0];
+  __start0 -> A;
+  A [shape=circle, style=filled, fillcolor=lightgreen];
+  F [shape=doublecircle, style=filled, fillcolor=lightpink];
+
+  B1; C1; D1;
+  B2; C2; D2;
+
+  A -> B1 [label="x"];
+  B1 -> C1 [label="v"];
+  C1 -> D1 [label="z"];
+  D1 -> B1 [label="w"];
+
+  A -> B2 [label="y"];
+  B2 -> C2 [label="v"];
+  C2 -> D2 [label="z"];
+  D2 -> B2 [label="w"];
+
+  // kruispaden die de twee cycli met elkaar verbinden:
+  D1 -> B2 [label="p"];
+  D2 -> B1 [label="q"];
+
+  D1 -> F [label="f"];
+  D2 -> F [label="g"];
+}
