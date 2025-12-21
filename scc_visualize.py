@@ -5,6 +5,34 @@ from pathlib import Path
 import pydot
 import networkx as nx
 
+"""
+ALGORITME BESCHRIJVING: SCC VISUALIZER & COLORIZER
+==================================================
+
+Dit script analyseert een gerichte graaf (DOT-formaat) en identificeert de 
+'Strongly Connected Components' (SCC's). Een SCC is een deel van de graaf 
+waarin elke knoop bereikbaar is vanaf elke andere knoop binnen diezelfde 
+component (een cyclus of een groep overlappende cycli).
+
+Het proces verloopt in 3 stappen:
+
+1. SCC ANALYSE (Tarjan of Kosaraju algoritme via NetworkX)
+   - Het script zoekt naar groepen knopen die samen gesloten lussen vormen.
+   - Knopen die geen deel uitmaken van een cyclus worden elk als een 
+     afzonderlijke SCC (van 1 knoop) beschouwd.
+
+2. KLEURCODERING
+   - Elke unieke SCC krijgt een eigen kleur toegewezen uit een kleurenpalet.
+   - Dit helpt de gebruiker om in één oogopslag te zien welke knopen 
+     onderling verbonden zijn en waar de "logische blokken" in de flow zitten.
+
+3. VISUALISATIE EXPORT
+   - Het script genereert een nieuw .dot-bestand in de map 'Output/'.
+   - De oorspronkelijke structuur en labels blijven behouden, maar de knopen 
+     worden ingekleurd op basis van hun SCC-lidmaatschap.
+   - Er wordt een instructie geprint om de DOT-file om te zetten naar een 
+     afbeelding (PNG) via Graphviz.
+"""
 
 def load_graph(dot_file: str) -> nx.DiGraph:
     graphs = pydot.graph_from_dot_file(dot_file)

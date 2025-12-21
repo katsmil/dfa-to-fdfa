@@ -3,6 +3,40 @@ import networkx as nx
 from networkx.algorithms import isomorphism
 from itertools import combinations
 
+"""
+ALGORITME BESCHRIJVING: SCC ISOMORPHISM CHECKER
+==============================================
+
+Dit script identificeert niet alleen Strongly Connected Components (SCC's), 
+maar vergelijkt ze ook onderling om te bepalen of ze "isomorf" zijn. 
+
+Isomorfie in deze context betekent dat twee subgrafen exact dezelfde 
+topologische structuur hebben én dat de labels op de verbindingen (edges) 
+overeenkomen.
+
+Het proces werkt als volgt:
+
+1. SCC EXTRACTIE & FILTERING
+   - Het script zoekt alle SCC's in de graaf.
+   - Het negeert 'triviale' SCC's (losse knopen zonder lus naar zichzelf). 
+     Alleen clusters van 2 of meer knopen worden meegenomen voor vergelijking.
+
+2. SUBGRAAF CONSTRUCTIE
+   - Voor elke interessante SCC wordt een tijdelijke, op zichzelf staande 
+     subgraaf gemaakt (`subgraph().copy()`).
+
+3. ISOMORFISME VALIDATIE (VF2 Algoritme)
+   - Het script gebruikt het VF2-algoritme (via `DiGraphMatcher`) om paren 
+     SCC's te vergelijken.
+   - Syntactische check: Is de vorm van de graaf gelijk (aantal knopen en pijlen)?
+   - Semantische check: Komt de data op de pijlen (zoals de "label" attribute) 
+     exact overeen? We gebruiken hiervoor `categorical_edge_match`.
+
+4. RESULTAAT
+   - Het script rapporteert welke groepen knopen structureel identiek zijn, 
+     wat helpt bij het opsporen van gedupliceerde logica of herhalende patronen 
+     in complexe systemen.
+"""
 
 def load_graph(dot_file: str) -> nx.DiGraph:
     graphs = pydot.graph_from_dot_file(dot_file)
