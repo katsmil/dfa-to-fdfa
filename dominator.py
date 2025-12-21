@@ -1,6 +1,41 @@
 import networkx as nx
 from collections import defaultdict
 
+"""
+ALGORITME BESCHRIJVING: ISOMORPHISM
+====================================================
+
+Dit script identificeert structureel identieke (isomorfe) subgrafen binnen een 
+grotere gerichte graaf (zoals een control flow graph). Het doel is om patronen 
+te vinden die zich herhalen, zelfs als de knoop-namen verschillen.
+
+Het algoritme werkt in 4 fasen:
+
+1. PRE-PROCESSING (DOT -> Graaf & SCCs)
+   - De graaf wordt ingelezen en edge-labels worden bewaard.
+   - De graaf wordt opgesplitst in Strongly Connected Components (SCCs). 
+     We zoeken alleen naar patronen binnen deze cyclische clusters.
+
+2. DOMINATOR REGIO EXTRACTIE
+   - Binnen een SCC berekenen we de 'dominator tree'.
+   - Voor elke knoop D bepalen we de regio die hij domineert (alle knopen die 
+     onbereikbaar zijn zonder eerst door D te gaan).
+   - *Maximaliteits-filter*: We filteren geneste regio's weg. Als regio X 
+     volledig vervat zit in regio Y (bijv. een kleine lus binnen een grotere lus), 
+     behouden we alleen de grootste regio Y. Dit zorgt voor logische groepering 
+     op het hoogste niveau.
+
+3. CANONICAL HASHING
+   - Om te bepalen of twee regio's identiek zijn, berekenen we een unieke hash.
+   - De hash is gebaseerd op de *structuur* en de *labels van de edges*.
+   - Dit gebeurt iteratief: elke knoop beschrijft zichzelf aan de hand van zijn 
+     uitgaande edges en de buren. Na N iteraties vormt dit een unieke handtekening.
+
+4. GROEPERING
+   - Regio's met exact dezelfde hash worden gegroepeerd.
+   - Groepen groter dan 1 worden gerapporteerd als isomorfe duplicaten.
+"""
+
 # ============================================================
 # DOT -> NetworkX DiGraph
 # ============================================================
@@ -78,28 +113,52 @@ def format_node(edges):
 # ============================================================
 # Dominator-regio extractie
 # ============================================================
+# Elke node domineert zichzelf
+import networkx as nx
 
 def dominator_regions(G, start, scc):
+    # 1. Bereken immediate dominators
     idom = nx.immediate_dominators(G, start)
 
-    # volledige dominatorsets afleiden uit idom
+    # 2. Bereken voor elke knoop de set van ALLE dominators (niet alleen immediate)
     dom = {}
     for n in scc:
         dom[n] = set()
         cur = n
+        # Loop terug omhoog in de dominator boom
         while cur in idom:
             dom[n].add(cur)
-            if cur == idom[cur]:
+            if cur == idom[cur]: # Stop bij de root
                 break
             cur = idom[cur]
 
-    regions = {}
+    # 3. Bouw alle mogelijke regio's (kandidaten)
+    candidates = {}
     for d in scc:
+        # Een regio voor dominator 'd' bevat alle knopen 'n' waarvoor 'd' een dominator is
         region = {n for n in scc if d in dom[n]}
         if len(region) > 1:
-            regions[d] = region
+            candidates[d] = region
 
-    return regions
+    # 4. FILTER: Behoud alleen de maximale regio's
+    # We sorteren op grootte (grootste eerst). Als een regio een subset is van
+    # een regio die we al hebben opgeslagen, gooien we hem weg.
+    final_regions = {}
+    
+    # Sorteer kandidaten op lengte van de set (descending)
+    sorted_candidates = sorted(candidates.items(), key=lambda item: len(item[1]), reverse=True)
+
+    for d, region in sorted_candidates:
+        is_subset = False
+        for existing_region in final_regions.values():
+            if region.issubset(existing_region):
+                is_subset = True
+                break
+        
+        if not is_subset:
+            final_regions[d] = region
+
+    return final_regions
 
 
 # ============================================================
