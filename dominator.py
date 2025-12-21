@@ -9,6 +9,15 @@ Dit script identificeert structureel identieke (isomorfe) subgrafen binnen een
 grotere gerichte graaf (zoals een control flow graph). Het doel is om patronen 
 te vinden die zich herhalen, zelfs als de knoop-namen verschillen.
 
+Dit algoritme past Dominator Theory toe binnen SCC's om betekenisvolle substructuren te isoleren. 
+Waar een SCC een ruwe groep knopen is die samen een lus vormen, 
+gebruiken we dominators om de 'ingang' en de hiërarchische afhankelijkheden binnen die lus te bepalen.
+
+Aanname:
+- Een regio die gedomineerd wordt door een knoop D is een logische eenheid.
+- Misschien is de hele SCC niet gelijk, maar bevatten twee verschillende SCC's wel een identiek dominator-blok 
+  (bijvoorbeeld een foutafhandeling die in elke loop hetzelfde is).
+
 Het algoritme werkt in 4 fasen:
 
 1. PRE-PROCESSING (DOT -> Graaf & SCCs)
