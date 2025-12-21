@@ -1,0 +1,15 @@
+{
+    "configurations": [
+        {
+            "name": "Python Debugger: dominator.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/dominator.py",
+            "console": "integratedTerminal",
+            "args": [
+                "Input/example2.dot",
+                "A"
+            ]
+        }
+    ]
+}
