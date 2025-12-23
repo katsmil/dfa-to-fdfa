@@ -1,14 +1,34 @@
 {
     "configurations": [
         {
-            "name": "Python Debugger: dominator.py",
+            "name": "Determine iso between regions found by dominator theory",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/dominator.py",
+            "program": "${workspaceFolder}/dominator_region_isomorphism.py",
             "console": "integratedTerminal",
             "args": [
-                "Input/example2.dot",
-                "A"
+                "Input/scc_distinct_preheader_entries.dot",
+                "P1"
+            ]
+        },
+        {
+            "name": "Dynamically determine startnode for dominator search algo",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/root_agnostic_dominator_region_isomorphism.py",
+            "console": "integratedTerminal",
+            "args": [
+                "Input/scc_single_preheader_entry.dot"
+            ]
+        },
+        {
+            "name": "Calculate Dominator Regions by Virtual Node",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/dominator_virtual_node.py",
+            "console": "integratedTerminal",
+            "args": [
+                "Input/scc_single_preheader_entry.dot"
             ]
         }
     ]
