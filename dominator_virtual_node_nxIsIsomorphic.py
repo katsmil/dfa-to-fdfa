@@ -166,20 +166,50 @@ def find_isomorphic_components(dot_file):
         # 5. Hash de regio's voor isomorfie-check
         for entry, nodes in final_regions.items():
             H = G.subgraph(nodes)
-            h = canonical_hash(H, nodes)
             all_components.append({
                 'entry': entry,
                 'nodes': nodes,
-                'hash': h
+                'structure': H
             })
 
-    # 6. Groeperen op basis van de hash
+    # 6. Groeperen op basis van isomorfie
+    isomorphic_groups = []
+    
+    for comp in all_components:
+        found_match = False
+        
+        for group in isomorphic_groups:
+            # Pak de eerste graaf uit de groep als referentie
+            reference_comp = group[0]
+            
+            # Snelle pre-check: hebben ze hetzelfde aantal knopen/edges?
+            # Dit versnelt het proces aanzienlijk.
+            if (comp['structure'].number_of_nodes() == reference_comp['structure'].number_of_nodes() and
+                comp['structure'].number_of_edges() == reference_comp['structure'].number_of_edges()):
+                
+                # De eigenlijke NetworkX isomorfie check
+                if nx.is_isomorphic(comp['structure'], reference_comp['structure']):
+                    group.append(comp)
+                    found_match = True
+                    break
+        
+        if not found_match:
+            # Start een nieuwe groep voor deze unieke structuur
+            isomorphic_groups.append([comp])
+
+    # 7. Filteren: alleen groepen teruggeven die meer dan één component bevatten
+    return [g for g in isomorphic_groups if len(g) > 1]
+    
+    #en dan ieder element in de lijst van all_components met elkaar vergelijk 
+    #middels de isomorfie check van networkx?
+
+    """ # 6. Groeperen op basis van de hash
     groups = defaultdict(list)
     for comp in all_components:
         groups[comp['hash']].append(comp)
 
     # Alleen groepen met meer dan 1 exemplaar zijn interessant (isomorfie)
-    return [g for g in groups.values() if len(g) > 1]
+    return [g for g in groups.values() if len(g) > 1] """
 
 # ============================================================
 # CLI
@@ -199,7 +229,7 @@ if __name__ == "__main__":
     
     for i, group in enumerate(isomorphic_groups, 1):
         print(f"\nIsomorfe Groep {i}:")
-        print(f"  Hash: {group[0]['hash'][0][:15]}...") 
+       # print(f"  Hash: {group[0]['hash'][0][:15]}...") 
         for item in group:
             print(f"  - Entry: {item['entry']}")
             print(f"    Nodes: {sorted(list(item['nodes']))}")
