@@ -75,6 +75,16 @@
             "args": [
                 "${input:inputFile}"
             ]
+        },
+        {
+            "name": "TEST",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/code/TEST.py",
+            "console": "integratedTerminal",
+            "args": [
+                "${input:inputFile}"
+            ]
         }
     ],
     "inputs": [

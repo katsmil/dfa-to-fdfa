@@ -1,0 +1,61 @@
+import networkx as nx
+from utils.graph_utils import read_dot
+from analysis.dominator_analysis import get_maximal_regions
+
+def find_isomorphic_components(dot_file):
+    G = read_dot(dot_file)
+    all_components = []
+
+    # 1. Analyse per SCC
+    for scc in nx.strongly_connected_components(G):
+        if len(scc) < 2:
+            continue
+
+        regions = get_maximal_regions(G, scc)
+
+        for entry, nodes in regions.items():
+            all_components.append({
+                'entry': entry,
+                'nodes': nodes,
+                'structure': G.subgraph(nodes).copy()
+            })
+
+    # 2. Isomorfie Groepering
+    groups = []
+    for comp in all_components:
+        found = False
+        for group in groups:
+            ref = group[0]
+            # Pre-checks voor snelheid
+            if (comp['structure'].number_of_nodes() == ref['structure'].number_of_nodes() and
+                comp['structure'].number_of_edges() == ref['structure'].number_of_edges()):
+                
+                # Check of labels ook overeenkomen
+                nm = lambda n1, n2: n1.get('label') == n2.get('label')
+                if nx.is_isomorphic(comp['structure'], ref['structure'], node_match=nm):
+                    group.append(comp)
+                    found = True
+                    break
+        if not found:
+            groups.append([comp])
+
+    return [g for g in groups if len(g) > 1]
+
+if __name__ == "__main__":
+    import sys
+    if len(sys.argv) != 2:
+        print("Gebruik: python dominator.py <file.dot>")
+        sys.exit(1)
+
+    dot_file = sys.argv[1]
+    isomorphic_groups = find_isomorphic_components(dot_file)
+
+    print(f"\n--- Analyse Resultaten ---")
+    if not isomorphic_groups:
+        print("Geen isomorfe dominator-regio's gevonden.")
+    
+    for i, group in enumerate(isomorphic_groups, 1):
+        print(f"\nIsomorfe Groep {i}:")
+        for item in group:
+            print(f"  - Entry: {item['entry']}")
+            print(f"    Nodes: {sorted(list(item['nodes']))}")
