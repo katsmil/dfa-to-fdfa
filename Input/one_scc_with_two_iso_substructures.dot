@@ -17,27 +17,13 @@ digraph G {
   C2 -> D2 [label="z"];
   D2 -> B2 [label="u"];
 
-  D1 -> B2 [label="cross"];
+  D1 -> B2 [label="w"];
   D2 -> B1 [label="back"];
-
-  // --- SCC 2: Beta Groep (De tweede complexe component, Isomorf) ---
-  // Ook twee onderling verbonden lussen
-  K1 -> L1 [label="v"];
-  L1 -> M1 [label="z"];
-  M1 -> K1 [label="u"];
-  
-  K2 -> L2 [label="v"];
-  L2 -> M2 [label="z"];
-  M2 -> K2 [label="u"];
-
-  M1 -> K2 [label="cross"];
-  M2 -> K1 [label="back"];
 
   // --- De verbindingen die de structuur bepalen ---
   A -> B1 [label="entry_alpha"];
-  A -> K1 [label="entry_beta"];
 
   // Exits naar het einde
   D2 -> F [label="exit_alpha"];
-  M2 -> F [label="exit_beta"];
+
 }

@@ -1,6 +1,26 @@
 import networkx as nx
 from collections import defaultdict
 
+"""
+MODULE: Dominator Analysis Toolkit
+==================================
+
+Deze module bevat de kernlogica voor het extraheren van hiërarchische structuren
+binnen Strongly Connected Components (SCC's).
+
+De Virtual Root Strategie:
+--------------------------
+In complexe automaten kunnen lussen meerdere ingangen hebben of onderling verbonden 
+zijn via cross-edges.
+
+Door een __VIRTUAL_ROOT__ per SCC te introduceren:
+1. Isoleren we de SCC van de rest van de graaf.
+2. Worden alle 'Entry Points' (knopen die van buiten de SCC bereikbaar zijn) 
+   als directe kinderen van de Virtual Root behandeld.
+3. Worden parallelle structuren binnen een SCC als 'siblings' (broers/zussen) 
+   gezien in de dominator-boom, in plaats van een geforceerde hiërarchie.
+"""
+
 def get_scc_dominators(G, scc_nodes):
     """Creëert een virtuele root boven alle ingangen van de SCC."""
     S = G.subgraph(scc_nodes).copy()

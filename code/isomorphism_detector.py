@@ -2,6 +2,27 @@ import networkx as nx
 from utils.graph_utils import read_dot
 from analysis.dominator_analysis import get_maximal_regions
 
+"""
+ALGORITME: Dominator-Based Isomorphism Detector
+===============================================
+
+Dit script identificeert herhalende (isomorfe) structuren binnen een gerichte graaf (DFA/Control Flow Graph).
+
+Kernstappen:
+1. SCC-Isolatie: De graaf wordt opgedeeld in Strongly Connected Components.
+2. Dominator Analyse: Binnen elke SCC worden regio's gevormd op basis van de 
+   'Virtual Root Dominator' methode. Dit isoleert lussen met meerdere ingangen.
+3. Maximale Regio's: Alleen de grootste logische structuren worden behouden 
+   (geen fragmenten die al onderdeel zijn van een grotere regio).
+4. Isomorfie Check (NetworkX): 
+   In plaats van handmatige hashing gebruiken we `nx.is_isomorphic`.
+   Eerst wordt een pre-check gedaan op het aantal knopen en randen voor snelheid.
+   https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.isomorphism.is_isomorphic.html#networkx.algorithms.isomorphism.is_isomorphic
+
+Gebruik:
+    python isomorphism_detector.py <pad_naar_file.dot>
+"""
+
 def find_isomorphic_components(dot_file):
     G = read_dot(dot_file)
     all_components = []
@@ -44,7 +65,7 @@ def find_isomorphic_components(dot_file):
 if __name__ == "__main__":
     import sys
     if len(sys.argv) != 2:
-        print("Gebruik: python dominator.py <file.dot>")
+        print(f"Gebruik: python {sys.argv[0]} <file.dot>")
         sys.exit(1)
 
     dot_file = sys.argv[1]

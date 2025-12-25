@@ -70,7 +70,7 @@
             "name": "[NX IsIsomorphic]Dominator Regons by Virtual Node",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/dominator_virtual_node_nxIsIsomorphic.py",
+            "program": "${workspaceFolder}/code/isomorphism_detector.py",
             "console": "integratedTerminal",
             "args": [
                 "${input:inputFile}"
@@ -92,7 +92,7 @@
             "id": "inputFile",
             "type": "promptString",
             "description": "Input file path (bijv. Input/scc_single_preheader_entry.dot)",
-            "default": "Input/scc_single_preheader_entry.dot"
+            "default": "input/scc_single_preheader_entry.dot"
         },
         {
             "id": "nodeName",
