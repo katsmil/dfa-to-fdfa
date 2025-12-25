@@ -77,6 +77,16 @@
             ]
         },
         {
+            "name": "Iso check with Natural Loops",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/code/natural_loop_isomorphism.py",
+            "console": "integratedTerminal",
+            "args": [
+                "${input:inputFile}"
+            ]
+        },
+        {
             "name": "TEST",
             "type": "debugpy",
             "request": "launch",
@@ -91,7 +101,7 @@
         {
             "id": "inputFile",
             "type": "promptString",
-            "description": "Input file path (bijv. Input/scc_single_preheader_entry.dot)",
+            "description": "input file path (bijv. input/<filename>.dot)",
             "default": "input/scc_single_preheader_entry.dot"
         },
         {

@@ -51,9 +51,10 @@ def find_isomorphic_components(dot_file):
             if (comp['structure'].number_of_nodes() == ref['structure'].number_of_nodes() and
                 comp['structure'].number_of_edges() == ref['structure'].number_of_edges()):
                 
-                # Check of labels ook overeenkomen
-                nm = lambda n1, n2: n1.get('label') == n2.get('label')
-                if nx.is_isomorphic(comp['structure'], ref['structure'], node_match=nm):
+                # Check of labels ook overeenkomen, dit kan op edges en op nodes
+                em = lambda e1, e2: e1.get('label') == e2.get('label')
+                #nm = lambda n1, n2: n1.get('label') == n2.get('label')
+                if nx.is_isomorphic(comp['structure'], ref['structure'], edge_match=em):
                     group.append(comp)
                     found = True
                     break
