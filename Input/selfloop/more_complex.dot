@@ -1,0 +1,80 @@
+digraph G_complex {
+  rankdir=LR;
+  node [fontname="Arial", style=filled];
+
+  // --- Start & End ---
+  __start0 [label="" shape=none width=0 height=0];
+  __start0 -> A;
+  A [fillcolor=lightgreen];
+  F [shape=doublecircle, fillcolor=lightpink];
+
+  // --- REGIO ALPHA (Grijze tint) ---
+  node [fillcolor="#eeeeee"]; 
+  a_B1 [label="B1"]; a_C1 [label="C1"]; a_D1 [label="D1"];
+  a_B2 [label="B2"]; a_C2 [label="C2"]; a_D2 [label="D2"];
+
+  a_B1 -> a_C1 [label="v"];
+  a_C1 -> a_D1 [label="z"];
+  a_D1 -> a_B1 [label="u"];
+  a_B2 -> a_C2 [label="v"];
+  a_C2 -> a_D2 [label="z"];
+  a_D2 -> a_B2 [label="u"];
+  a_D1 -> a_B2 [label="cross"];
+  a_D2 -> a_B1 [label="back"];
+  
+  // Extra interne randen
+  a_B1 -> a_D2 [label="x"];
+  a_C2 -> a_B1 [label="y"];
+  a_B1 -> a_B1 [label="ε"];
+
+  // --- REGIO BETA (Blauwe tint) ---
+  node [fillcolor="#e1f5fe"];
+  b_K1 [label="K1"]; b_L1 [label="L1"]; b_M1 [label="M1"];
+  b_K2 [label="K2"]; b_L2 [label="L2"]; b_M2 [label="M2"];
+
+  b_K1 -> b_L1 [label="v"];
+  b_L1 -> b_M1 [label="z"];
+  b_M1 -> b_K1 [label="u"];
+  b_K2 -> b_L2 [label="v"];
+  b_L2 -> b_M2 [label="u"];
+  b_M2 -> b_K2 [label="z"];
+  b_M1 -> b_K2 [label="cross"];
+  b_M2 -> b_K1 [label="back"];
+  
+  // Extra interne randen (isomorf met Alpha)
+  b_K1 -> b_M2 [label="x"];
+  b_L2 -> b_K1 [label="y"];
+  b_K1 -> b_K1 [label="ε"];
+  b_L2 -> b_L2 [label="v"];
+
+  // --- REGIO GAMMA (Gele tint) ---
+  node [fillcolor="#fff9c4"];
+  g_G1 [label="G1"]; g_G2 [label="G2"]; g_G3 [label="G3"]; 
+  g_G4 [label="G4"]; g_G5 [label="G5"];
+
+  g_G1 -> g_G2;
+  g_G2 -> g_G3;
+  g_G3 -> g_G1;           // triangle
+  g_G3 -> g_G4;
+  g_G4 -> g_G5;
+  g_G5 -> g_G3;           // second triangle
+  g_G1 -> g_G4;           // clique edge
+  g_G2 -> g_G5;           // clique edge
+
+  // --- Interconnecties & Exits ---
+  node [fillcolor=white]; // Reset kleur voor noise/special edges
+  A -> a_B1 [label="entry_alpha"];
+  A -> b_K2 [label="alt_entry_beta"];
+  a_D1 -> b_K1 [label="transit"];
+  a_C2 -> g_G1 [label="alpha_to_gamma"];
+  b_M2 -> g_G5 [label="beta_to_gamma"];
+
+  a_D2 -> F [label="exit_alpha"];
+  b_M2 -> F [label="exit_beta"];
+  g_G5 -> F [label="exit_gamma"];
+
+  // Self loops buiten SCC
+  A -> A [label="stay"];
+  F -> F [label="halt"];
+
+}

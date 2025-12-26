@@ -87,6 +87,16 @@
             ]
         },
         {
+            "name": "MINIMIZATION",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/code/minimization.py",
+            "console": "integratedTerminal",
+            "args": [
+                "${input:inputFile}"
+            ]
+        },
+        {
             "name": "TEST",
             "type": "debugpy",
             "request": "launch",

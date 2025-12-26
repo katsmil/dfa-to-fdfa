@@ -1,0 +1,18 @@
+digraph SCC_q1_q3_DFA {
+  rankdir=LR;
+
+  __start0 [shape=none label=""];
+  __start0 -> q1;
+
+  q1;
+  q3;
+  sink [shape=box];
+
+  q1 -> q3 [label="a"];
+  q1 -> q1 [label="b"];
+
+  q3 -> q1 [label="a"];
+  q3 -> sink [label="b"];
+
+  sink -> sink [label="a,b"];
+}
