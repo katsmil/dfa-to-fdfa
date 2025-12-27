@@ -90,7 +90,7 @@
             "name": "MINIMIZATION",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/minimization.py",
+            "program": "${workspaceFolder}/code/minimization[PoC].py",
             "console": "integratedTerminal",
             "args": [
                 "${input:inputFile}"

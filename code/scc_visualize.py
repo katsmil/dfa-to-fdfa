@@ -116,8 +116,8 @@ def main():
     input_dot = sys.argv[1]
     input_path = Path(input_dot)
 
-    # Zorg ervoor dat de Output folder bestaat
-    output_folder = Path("Output")
+    # Zorg ervoor dat de output folder bestaat
+    output_folder = Path("output")
     output_folder.mkdir(parents=True, exist_ok=True)
 
     # Genereer output bestandsnaam op basis van input
