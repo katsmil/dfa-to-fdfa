@@ -97,20 +97,20 @@
             ]
         },
         {
-            "name": "Bisimilar",
+            "name": "Bisimilar SCC",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/bisimilar/bisimilar.py",
+            "program": "${workspaceFolder}/code/bisimilar/bisimilar_scc.py",
             "console": "integratedTerminal",
             "args": [
                 "${input:inputFile}"
             ]
         },
         {
-            "name": "TEST",
+            "name": "Bisimilar Signature",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/bisimilar/test.py",
+            "program": "${workspaceFolder}/code/bisimilar/bisimilar_signature.py",
             "console": "integratedTerminal",
             "args": [
                 "${input:inputFile}"

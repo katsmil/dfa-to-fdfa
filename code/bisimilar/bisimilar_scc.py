@@ -1,52 +1,6 @@
 import networkx as nx
 from utils.graph_utils import read_dot
 
-# def find_maximal_bisimilar_overlap(G, start_a, start_b):
-#     """
-#     Vindt de grootste bisimulaire overlap tussen twee structuren.
-#     Edges zonder 'label' attribuut worden genegeerd.
-#     """
-#     equivalent_pairs = {} 
-#     stack = [(start_a, start_b)]
-#     visited = set()
-    
-#     while stack:
-#         n1, n2 = stack[-1]
-        
-#         if (n1, n2) in visited:
-#             stack.pop()
-#             continue
-        
-#         visited.add((n1, n2))
-        
-#         # Robuuste edge-extractie: skip edges zonder label
-#         edges1 = {d['label']: v 
-#                   for _, v, d in G.out_edges(n1, data=True) 
-#                   if 'label' in d}
-#         edges2 = {d['label']: v 
-#                   for _, v, d in G.out_edges(n2, data=True) 
-#                   if 'label' in d}
-        
-#         # Check of structuur matcht
-#         if set(edges1.keys()) != set(edges2.keys()):
-#             visited.remove((n1, n2))
-#             stack.pop()
-#             continue
-        
-#         # Voeg opvolgers toe
-#         has_unvisited = False
-#         for char in edges1.keys():
-#             next1, next2 = edges1[char], edges2[char]
-#             if (next1, next2) not in visited:
-#                 stack.append((next1, next2))
-#                 has_unvisited = True
-        
-#         if not has_unvisited:
-#             equivalent_pairs[n1] = n2
-#             stack.pop()
-    
-#     return equivalent_pairs
-
 def is_accepting(G, node):
     """
     Hulpfunctie om te bepalen of een node een eindtoestand is.
