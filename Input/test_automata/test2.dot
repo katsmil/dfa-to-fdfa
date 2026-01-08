@@ -1,0 +1,59 @@
+digraph G {
+  rankdir=LR;
+  node [fontname="Arial", style=filled]; // Standaard stijl voor alle knopen
+
+  __start0 [label="" shape=none width=0 height=0];
+  __start0 -> A;
+  A [fillcolor=lightgreen];
+  F [shape=doublecircle, fillcolor=lightpink];
+  a_D1 [shape = doublecircle];
+
+  // --- REGIO ALPHA (Grijze tint) ---
+  node [fillcolor="#eeeeee"]; 
+  a_B1 [label="B1"]; a_C1 [label="C1"]; a_D1 [label="D1"];
+  a_B2 [label="B2"]; a_C2 [label="C2"]; a_D2 [label="D2"];
+
+  a_B1 -> a_C1 [label="v"];
+  a_C1 -> a_D1 [label="z"];
+
+  
+  a_B2 -> a_C2 [label="w"];
+  a_C2 -> a_D2 [label="x"];
+
+
+  a_D1 -> a_B2 [label="y"];
+  
+  a_B1 -> a_B1 [label="ε"];
+  
+  a_D2 -> a_B1 [label="back"];
+
+  // --- REGIO BETA (Blauwe tint) ---
+  node [fillcolor="#e1f5fe"];
+  b_K1 [label="K1"]; b_L1 [label="L1"]; b_M1 [label="M1"];
+  b_K2 [label="K2"]; b_L2 [label="L2"]; b_M2 [label="M2"];
+
+  b_K1 -> b_L1 [label="v"];
+  b_L1 -> b_M1 [label="z"];
+  
+  
+  b_K2 -> b_L2 [label="w"];
+  b_L2 -> b_M2 [label="x"];
+  
+
+  b_M1 -> b_K2 [label="y"];
+ 
+  b_K1 -> b_K1 [label="ε"];
+  
+  b_M2 -> b_K1 [label="back"];
+
+  // --- Verbindingen ---
+  node [fillcolor=white]; // Reset kleur voor rest
+  A -> a_B1 [label="entry_alpha"];
+  a_D2 -> b_K1 [label="transit"];
+
+  a_D2 -> F [label="exit_alpha"];
+  b_M2 -> F [label="exit_beta"];
+  
+  A  -> A  [label="stay"];
+  F  -> F  [label="halt"];
+}
