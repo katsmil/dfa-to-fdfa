@@ -115,6 +115,26 @@
             "args": [
                 "${input:inputFile}"
             ]
+        },
+        {
+            "name": "Bisimilar Sign + HK Optimalization",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/code/bisimilar/bisimilar_sign_HK_optimalization.py",
+            "console": "integratedTerminal",
+            "args": [
+                "${input:inputFile}"
+            ]
+        },
+        {
+            "name": "test",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/code/test.py",
+            "console": "integratedTerminal",
+            "args": [
+                "${input:inputFile}"
+            ]
         }
     ],
     "inputs": [
