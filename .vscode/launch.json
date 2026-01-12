@@ -1,40 +1,16 @@
-/* {
-    "configurations": [
-        {
-            "name": "Determine iso between regions found by dominator theory",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/dominator_region_isomorphism.py",
-            "console": "integratedTerminal",
-            "args": [
-                "Input/scc_distinct_preheader_entries.dot",
-                "P1"
-            ]
-        },
-        {
-            "name": "Dynamically determine startnode for dominator search algo",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/root_agnostic_dominator_region_isomorphism.py",
-            "console": "integratedTerminal",
-            "args": [
-                "Input/scc_single_preheader_entry.dot"
-            ]
-        },
-        {
-            "name": "Calculate Dominator Regions by Virtual Node",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/dominator_virtual_node.py",
-            "console": "integratedTerminal",
-            "args": [
-                "Input/scc_single_preheader_entry.dot"
-            ]
-        }
-    ]
-} */
 {
     "configurations": [
+        {
+            "name": "Main - Recognize and Factorize Substructures",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/code/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "bisimilar-hk",
+                "${input:inputFile}"
+            ]
+        },
         {
             "name": "Determine iso between regions found by dominator theory",
             "type": "debugpy",
