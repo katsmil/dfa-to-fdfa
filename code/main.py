@@ -4,15 +4,12 @@ from pathlib import Path
 from bisimilar.bisimilar_sign_HK_optimalization import analyze_graph_factorization
 
 def run_bisimilar_sign_hk(input_file: str):
-    """Roept het bisimilar signature + HK optimalization algoritme aan."""
     print(f"Running Bisimilar Sign + HK Optimalization met input: {input_file}")
     print(f"--- Analyse van DFA factorisatie met HK-optimalisatie (e(R)) ---")
     print(f"Bestand: {input_file}\n")
     
-    # Roep de analyze functie aan
     results = analyze_graph_factorization(input_file)
     
-    # Print de resultaten
     if not results:
         print("Geen factoriseerbare overlap gevonden.")
     else:
@@ -32,7 +29,6 @@ def run_bisimilar_sign_hk(input_file: str):
 
 
 def main():
-    """Main functie die command line argumenten verwerkt."""
     parser = argparse.ArgumentParser(
         description="Hoofdprogramma voor bisimilar algoritmes"
     )
