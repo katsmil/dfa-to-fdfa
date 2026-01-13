@@ -1,0 +1,36 @@
+digraph G {
+  rankdir=LR;
+  node [fontname="Arial", style=filled];
+
+  __start0 [label="" shape=none width=0 height=0];
+  __start0 -> 1 [label="y"];
+  
+  __start1 [label="" shape=none width=0 height=0];
+  __start1 -> 11 [label="x"];
+
+  // --- REGIO 1 ---
+  node [fillcolor="#eeeeee"]; 
+  1 [label="1"]; 
+  2 [label="2"]; 
+  3 [label="3"];
+  4 [label="4"];
+  F [label="F" shape=doublecircle];
+
+  1 -> 2 [label="u"]
+  2 -> 3 [label="v"]
+  3 -> 4 [label="w"]
+  4 -> F [label="z"];
+  
+  // --- REGIO 2 ---
+  11 [label="RC"];
+
+  // Deze constraint=false voorkomt dat 11 helemaal naar links/rechts wordt getrokken
+  11 -> F [label="g", constraint=false]
+  
+  // --- Gestreepte lijnen ---
+  11 -> 1 [style=dashed, constraint=false];
+  4 -> 11 [style=dashed, constraint=false];
+
+  // --- Forceer 1 en 11 in dezelfde kolom ---
+  { rank = same; 1; 11; }
+}
