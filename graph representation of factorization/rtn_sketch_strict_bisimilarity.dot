@@ -1,4 +1,6 @@
 digraph G {
+    // Deze sketch heeft betrekking op een externe factorisatie
+    //, maar kan net zo goed in-place zijn.
     rankdir = LR;
     node [fontname="Arial", style=filled];
     // Standaard stijl voor alle knopen
