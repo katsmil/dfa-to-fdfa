@@ -22,76 +22,52 @@ class EquivalenceClosure:
         return self._find_representative(x) == self._find_representative(y)
 
 def filter_redundant_results(results):
+    # Sorteer op overlap_size (grootste eerst)
     sorted_results = sorted(results, key=lambda x: x['overlap_size'], reverse=True)
     kept_results = []
     
     for current in sorted_results:
-        current_pairs = current['matched_pairs']
+        # We vergelijken de volledige set van paren (internals + frontiers)
+        current_pairs = current['all_pairs']
         is_subset = False
+        
         for kept in kept_results:
-            if current_pairs.issubset(kept['matched_pairs']):
+            # Als alle paren in de huidige set al voorkomen in een grotere set,
+            # dan is resultaat redundant.
+            if current_pairs.issubset(kept['all_pairs']):
                 is_subset = True
                 break
+        
         if not is_subset:
             kept_results.append(current)
+            
     return kept_results
 
 def is_accepting(G, node):
     node_data = G.nodes[node]
     return node_data.get('shape') == 'doublecircle' or node_data.get('accepting') == 'true'
 
-def get_exit_points(G, matched_pairs):
-    """
-    Identificeert transities die de overlap verlaten.
-    Dit zijn de 'return' paden voor je RTN.
-    """
-    exit_points = []
-    # Maak sets van de individuele nodes in de overlap voor snelle lookup
-    nodes_in_overlap_a = {p[0] for p in matched_pairs}
-    nodes_in_overlap_b = {p[1] for p in matched_pairs}
-
-    for (u, v) in matched_pairs:
-        edges_u = {d['label']: target for _, target, d in G.out_edges(u, data=True)}
-        edges_v = {d['label']: target for _, target, d in G.out_edges(v, data=True)}
-        
-        # We kijken naar labels die beide hebben
-        common_labels = set(edges_u.keys()) & set(edges_v.keys())
-        for label in common_labels:
-            next_u = edges_u[label]
-            next_v = edges_v[label]
-            
-            # Als de opvolgers NIET in de overlap zitten, is dit een exit point
-            if (next_u, next_v) not in matched_pairs:
-                exit_points.append({
-                    'source_pair': (u, v),
-                    'label': label,
-                    'return_to': (next_u, next_v)
-                })
-    return exit_points
-
 def find_maximal_bisimilar_overlap(G, start_a, start_b, closure_eR):
-    # Stack bevat paren die we nog moeten controleren op 'uitbreidbaarheid' (strikte bisimulariteit)
     stack = [(start_a, start_b)]
     
-    # Dit is de set die we teruggeven: alle knopen in de structuur, INCLUSIEF de randen (q2/q8)
-    structure_pairs = set()
-    
-    # We houden bij welke paren we al 'strikt' hebben gecheckt om oneindige lussen te voorkomen
+    # We houden bij welke paren 'strikt' bisimilair zijn (de interne structuur)
     visited_strict = set()
-
-    # Eerste check: zijn de startknopen zelf wel een potentiële match?
-    # Zo niet, dan is er geen structuur om te beginnen.
-    if is_accepting(G, start_a) != is_accepting(G, start_b):
-        return set()
     
-    # Controleer initieel de labels van de startknopen
+    # We houden alle paren bij die bereikt worden (inclusief de randen)
+    all_reached_pairs = set()
+
+    # Validatie van de start
+    if is_accepting(G, start_a) != is_accepting(G, start_b):
+        return None
+    
     edges_start_a = {d['label'] for _, _, d in G.out_edges(start_a, data=True) if 'label' in d}
     edges_start_b = {d['label'] for _, _, d in G.out_edges(start_b, data=True) if 'label' in d}
+    
+    # Als de start al verschilt, is er helemaal geen overlap
     if edges_start_a != edges_start_b:
-        return set()
+        return None
 
-    # Als de start goed is, voegen we hem toe en beginnen we
-    structure_pairs.add((start_a, start_b))
+    all_reached_pairs.add((start_a, start_b))
 
     while stack:
         n1, n2 = stack.pop()
@@ -99,47 +75,40 @@ def find_maximal_bisimilar_overlap(G, start_a, start_b, closure_eR):
         if (n1, n2) in visited_strict:
             continue
         
-        # Haal uitgaande transities op
         edges1 = {d['label']: v for _, v, d in G.out_edges(n1, data=True) if 'label' in d}
         edges2 = {d['label']: v for _, v, d in G.out_edges(n2, data=True) if 'label' in d}
 
-        # STRIKTE CHECK:
-        # Om een 'interne' knoop van de structuur te zijn (waarvandaan we verder recursen),
-        # moeten de uitgaande labels en acceptance status exact gelijk zijn.
         is_strict_match = (
             is_accepting(G, n1) == is_accepting(G, n2) and 
             set(edges1.keys()) == set(edges2.keys())
         )
 
         if is_strict_match:
-            # Ze zijn strikt gelijk:
-            # 1. Markeer als bezocht voor recursie
             visited_strict.add((n1, n2))
-            
-            # 2. Update de closure (alleen voor strikte matches!)
             closure_eR.add_equivalence(n1, n2)
             
-            # 3. Bekijk de kinderen
             for label in edges1.keys():
                 next1 = edges1[label]
                 next2 = edges2[label]
                 next_pair = (next1, next2)
 
-                # BELANGRIJKSTE WIJZIGING:
-                # Omdat de transitie (n1->next1) en (n2->next2) identiek is (zelfde label),
-                # hoort het doelpaar (next1, next2) bij de structuur, ZELFS als ze daarna verschillen.
-                structure_pairs.add(next_pair)
-
-                # We voegen ze toe aan de stack om te kijken of de structuur NOG verder gaat.
-                # De check of ze strikt zijn gebeurt pas als we ze van de stack poppen.
+                all_reached_pairs.add(next_pair)
+                
+                # We pushen hem op de stack om te zien of hij ook strikt is.
                 if next_pair not in visited_strict:
                     stack.append(next_pair)
         
-        # Als het GEEN strikte match is (bv q2/q8 in Ristov fig 2), doen we niets.
-        # Het paar zit al in 'structure_pairs' (toegevoegd door de parent),
-        # maar we gaan niet verder recursen en voegen ze niet toe aan closure_eR.
+        # Als is_strict_match False is, dan is dit paar een 'Frontier'.
+        # We doen niets (niet op stack, niet in closure), maar hij zit wel in all_reached_pairs.
 
-    return structure_pairs
+    # Nu kunnen we de frontiers afleiden door het verschil te nemen
+    frontier_pairs = all_reached_pairs - visited_strict
+    
+    return {
+        'internal_pairs': visited_strict,
+        'frontier_pairs': frontier_pairs,
+        'all_pairs': all_reached_pairs
+    }
 
 def analyze_graph_factorization(dot_file):
     G_raw = nx.drawing.nx_pydot.read_dot(dot_file)
@@ -167,20 +136,20 @@ def analyze_graph_factorization(dot_file):
                 if pair_id in compared_pairs: continue
                 compared_pairs.add(pair_id)
 
-                overlap = find_maximal_bisimilar_overlap(G, n1, n2, closure_eR)
+                result = find_maximal_bisimilar_overlap(G, n1, n2, closure_eR)
                 
-                if len(overlap) >= 2: 
-                    # NIEUW: Bereken de exit points voor deze specifieke overlap
-                    exits = get_exit_points(G, overlap)
+                # Check of er resultaat is en of de overlap groot genoeg is, 
+                # bij een te kleine overlap loont de factorisatie niet
+                if result and len(result['all_pairs']) > 2: 
                     
                     results.append({
                         'start_nodes': (n1, n2),
-                        'overlap_size': len(overlap),
-                        'matched_pairs': overlap,
-                        'exit_points': exits
+                        'overlap_size': len(result['all_pairs']),
+                        'internals': result['internal_pairs'],
+                        'frontiers': result['frontier_pairs'], # DEZE zijn belangrijk voor de stack logica
+                        'all_pairs': result['all_pairs']
                     })
 
-    # Filter redundante resultaten
     return filter_redundant_results(results)
 
 if __name__ == "__main__":
@@ -201,13 +170,13 @@ if __name__ == "__main__":
         print(f"Totaal aantal unieke structuren gevonden: {len(results)}\n")
         
         for i, r in enumerate(results, 1):
-            n1, n2 = r['start_nodes']
             print(f"Structuur {i}:")
-            print(f"  Start-equivalentie: {n1} <-> {n2}")
-            print(f"  Grootte van geaccepteerde overlap: {r['overlap_size']} paren")
-            print("  Gevonden paren in deze klasse:")
-            
-            sorted_pairs = sorted(list(r['matched_pairs']), key=lambda x: str(x[0]))
-            for pair in sorted_pairs:
-                print(f"    - {pair[0]} matches met {pair[1]}")
+            print(f"  Start: {r['start_nodes'][0]} <-> {r['start_nodes'][1]}")
+            print(f"  Grootte: {r['overlap_size']} paren")
+            print(f"  Interne paren (Strict Bisimilair):")
+            for p in sorted(list(r['internals'])):
+                print(f"    - {p}")
+            print(f"  Frontier paren (Stack-Pop locaties):")
+            for p in sorted(list(r['frontiers'])):
+                print(f"    - {p}")
             print("-" * 40)
