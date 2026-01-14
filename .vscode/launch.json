@@ -7,7 +7,6 @@
             "program": "${workspaceFolder}/code/main.py",
             "console": "integratedTerminal",
             "args": [
-                "bisimilar-hk",
                 "${input:inputFile}"
             ]
         },

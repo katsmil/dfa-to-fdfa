@@ -30,7 +30,7 @@ digraph G {
   
   a_K1 -> a_K2 [label="cross"];
   a_K1 -> a_L1 [label="h"];
-  a_L1 -> a_M1 [label="w"];
+  a_L1 -> a_M1 [label="z"];
   a_M1 -> a_K1 [label="u"];
   a_M1 -> a_K2 [label="cross"];
   

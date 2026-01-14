@@ -1,6 +1,61 @@
+"""
+ALGORITME: DFA Factorisatie via Maximale Bisimulatie & Frontier Detectie
+========================================================================
+
+Dit script identificeert herhalende substructuren in een DFA die gefactoriseerd kunnen worden. 
+Het is specifiek ontworpen als voorbereidingsstap voor 
+het bouwen van een Recursive Transition Network (RTN) of een Recursieve Automaat (RA).
+
+KERNMERKEN:
+1. Signature Hashing (De "Buckets" maken)
+   -------------------------------
+   Om een volledige kwadratische complexiteit te voorkomen bij het vergelijken
+   van alle knopen, berekenen we eerst een lokale 'handtekening' voor elke knoop.
+   Deze handtekening bestaat uit de gesorteerde lijst van labels van uitgaande 
+   transities. Alleen knopen met identieke handtekeningen (die in dezelfde 'emmer' 
+   vallen) zijn kandidaat om een equivalente structuur te starten. 
+   Deze signatuur maken is O(n) complex.
+
+2. Zoeken naar herhalende substructuren
+   ---------------------------------------------------
+   Voor elk paar kandidaten uit dezelfde emmer starten we een parallelle
+   verkenning door de graaf. We controleren stap voor stap:
+   - Of de knopen dezelfde 'accepting' status hebben (eindtoestand vs normaal).
+   - Of de uitgaande transities (labels) exact overeenkomen.
+   
+   In plaats van enkel "Ja/Nee" te antwoorden bij de eerste fout, verzamelt 
+   dit proces alle knopenparen die equivalent zijn *totdat* er een mismatch 
+   optreedt ( frontier nodes worden ook gevonden, zie hieronder).
+   Dit levert de grootst mogelijke equivalente substructuur op.
+
+2. e(R) Optimalisatie:
+   -------------------------------
+   Gebruikt de Hopcroft-Karp benadering voor equivalentie-sluitingen
+   om dubbele vergelijkingen van reeds bekende equivalente structuren te voorkomen.
+   Transitiviteit, Symmetrie en Reflexiviteit
+
+3. Frontier Detectie:
+   -------------------------------
+   Maakt onderscheid tussen de 'body' van een substructuur (internals)
+   en de 'uitgangspunten' (frontiers). Dit is essentieel voor stack-gebaseerde executie.
+
+4. Maximale Overlap:
+   -------------------------------
+   Zoekt niet alleen naar strikte bisimulatie, maar vindt de grootste
+   isomorfe subgraaf tot aan het punt waar het gedrag divergeert.
+   Naar voorbeeld van figuur 2 uit het paper van Ristov.
+
+THEORETISCHE WERKING (Stack-gebaseerd):
+Tijdens de executie van de resulterende recursieve automaat dienen de 'Frontier Nodes' als 
+momenten waarop de stack gecontroleerd moet worden. Als in een frontier-toestand een input 
+niet verwerkt kan worden, wordt het stack-frame gepopt en keert de uitvoering terug naar 
+de call-site (de context van de aanroeper).
+"""
+
 from collections import defaultdict
 import networkx as nx
 
+#Naar analogie met Hopcroft en Karp's e(R) optimalisatie 
 class EquivalenceClosure:
     def __init__(self, elements):
         self.parent = {e: e for e in elements}
