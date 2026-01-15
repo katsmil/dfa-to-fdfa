@@ -37,6 +37,7 @@ digraph G {
   b_L1 -> b_M1 [label="z"];
   b_L1 -> b_L1a [label="g"];
   b_L1a -> b_L1 [label="h"];
+  b_L1a -> b_K1 [label="$"];
   b_M1 -> b_K1 [label="u"];
   
   b_K2 -> b_L2 [label="v"];
