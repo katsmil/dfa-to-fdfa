@@ -1,4 +1,16 @@
 digraph G {
+    label=<
+    <b>Toelichting:</b><br/>
+    Deze cyclische minimale DFA toont drie cyclische substructuren die herhalend zijn<br/>
+    te weten: (b1,c1,d1), (k1,l1,m1) en (r1,s1,t1).<br/>
+    Daarnaast bestaat er een acyclische staart in deze automaat, welke is aangegeven in geel.<br/>
+    Hiervoor geldt dat de structuur overeenkomt tussen de verzameling toestanden:<br/>
+    (1,2,3,4) en (11,12,13,14)
+    
+  >;
+  labelloc="t";
+  fontsize=30;
+
   rankdir=LR;
   node [fontname="Arial", style=filled]; // Standaard stijl voor alle knopen
 
@@ -6,6 +18,7 @@ digraph G {
   __start0 -> A;
   A [fillcolor=lightgreen];
   F [shape=doublecircle, fillcolor=lightpink];
+
 
   // --- REGIO ALPHA (Grijze tint) ---
   node [fillcolor="#eeeeee"]; 
