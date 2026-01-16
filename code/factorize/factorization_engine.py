@@ -39,6 +39,7 @@ def handle_frontier_divergence(G, factored_to_canonical_map, factored_nodes, fac
             
             # REGEL 2: Interne unieke transities (Divergentie)
             if label not in c_out:
+                # Stopconditie C: FrontierNode Factored Substructure wijst direct naar startnode
                 if f_target == factored_start:
                     G.add_edge(rc_node_id, rc_node_id, label=label)
                 else:
@@ -46,11 +47,16 @@ def handle_frontier_divergence(G, factored_to_canonical_map, factored_nodes, fac
                     if f_target not in preserved_nodes:
                         preserved_nodes.add(f_target)
                         queue.append(f_target)
+
+            # REGEL 3: Gedeeld intern gedrag
+            else:
+                # Label komt overeen met canonical en wijst intern: 
+                # Geen actie nodig, dit gedrag wordt vervangen door de RC-call.
+                pass
     
     return preserved_nodes, queue
 
 def traverse_and_preserve_unique_paths(G, queue, preserved_nodes, factored_nodes, factored_start, rc_node_id):
-    """Verkent recursief alle paden die behouden moeten blijven binnen de factored structuur."""
     visited_in_bfs = set()
     while queue:
         u = queue.popleft()
@@ -59,16 +65,20 @@ def traverse_and_preserve_unique_paths(G, queue, preserved_nodes, factored_nodes
         
         edges = list(G.out_edges(u, data=True))
         for _, v, data in edges:
+            # STOPCONDITIE B: Terug naar start -> Ombuigen naar RC
             if v == factored_start:
-                # Pad leidt terug naar start: ombuigen naar RC
                 G.remove_edge(u, v)
                 G.add_edge(u, rc_node_id, **data)
-            elif v in factored_nodes:
-                # Intern pad: toevoegen aan behoud-set
+            
+            # STOPCONDITIE A: Doel buiten substructuur -> Stop recursie (behoud edge)
+            elif v not in factored_nodes:
+                pass # We doen niets, de edge blijft bestaan vanuit de preserved node 'u'
+            
+            # VOORTZETTING: Intern pad -> Toevoegen aan queue
+            else:
                 if v not in preserved_nodes:
                     preserved_nodes.add(v)
                     queue.append(v)
-            # Externe transities vanuit behouden nodes blijven automatisch bestaan
 
 def add_call_return_edges(G, rc_node_id, canonical_start, frontiers):
     """Voegt de visuele call (blauw) en return (rood) lijnen toe tussen master en RC."""
