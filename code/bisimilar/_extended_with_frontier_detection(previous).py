@@ -174,10 +174,8 @@ def analyze_graph_factorization(dot_file):
 
     for n in nodes:
         out_labels = [data['label'] for _, v, data in G.out_edges(n, data=True) if 'label' in data]
-        accepting_status = is_accepting(G, n) # Voeg status toe
         if out_labels:
-            # De signature is nu een tuple van (status, gesorteerde_labels)
-            sig = (accepting_status, tuple(sorted(out_labels)))
+            sig = tuple(sorted(out_labels))
             signatures[sig].append(n)
 
     closure_eR = EquivalenceClosure(nodes)
