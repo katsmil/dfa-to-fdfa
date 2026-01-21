@@ -160,11 +160,8 @@ class SubstructureAnalyzer:
 
 def run_analysis(dot_file: str, min_size: int = 3) -> List[SubstructureMatch]:
     """Orchestreert het volledige analyse-proces op een DOT bestand."""
-    G = nx.DiGraph(nx.drawing.nx_pydot.read_dot(dot_file))
+    G = nx.nx_pydot.read_dot(dot_file)
     analyzer = SubstructureAnalyzer(G, min_overlap=min_size)
-    
-    result2 = G.out_edges('s0', data=True)
-    result = analyzer.get_node_signature('s0')
 
     # 1. Groepeer op signature om vergelijkingsruimte te verkleinen
     buckets = defaultdict(list)
