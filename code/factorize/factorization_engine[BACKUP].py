@@ -1,7 +1,5 @@
-from typing import List
 import networkx as nx
 from collections import deque
-from bisimilar.analyze_bisimilar_substructures import SubstructureMatch
 
 def _get_out_labels(G, node):
     """Hulpfunctie om labels van uitgaande transities te verzamelen."""
@@ -93,19 +91,18 @@ def cleanup_redundant_factored_nodes(G, factored_nodes, preserved_nodes):
     nodes_to_remove = factored_nodes - preserved_nodes
     G.remove_nodes_from(nodes_to_remove)
 
-def apply_factorization(G, results: List[SubstructureMatch]):
+def apply_factorization(G, results):
     """
-    De hoofdloop van het factorisatieproces. 
-    Werkt nu met SubstructureMatch objecten.
+    De hoofdloop van het factorisatieproces.
     """
     for i, res in enumerate(results):
-        canonical_start, factored_start = res.start_nodes
-        factored_nodes = {pair[1] for pair in res.all_pairs}
-        factored_to_canonical_map = {pair[1]: pair[0] for pair in res.all_pairs}
+        canonical_start, factored_start = res['start_nodes']
+        factored_nodes = {p[1] for p in res['all_pairs']}
+        factored_to_canonical_map = {p[1]: p[0] for p in res['all_pairs']}
         
         print(f"[{i+1}] Start factorisatie voor: {factored_start}")
 
-        # Stap 1: Infrastructuur (RC node aanmaken)
+        # Stap 1: Infrastructuur
         rc_node_id = create_recursive_call_node(G, factored_start, canonical_start)
         redirect_external_entries_to_rc(G, factored_start, factored_nodes, rc_node_id)
 
@@ -120,7 +117,7 @@ def apply_factorization(G, results: List[SubstructureMatch]):
         )
 
         # Stap 4: Koppeling & Opruimen
-        add_call_return_edges(G, rc_node_id, canonical_start, res.frontiers)
+        add_call_return_edges(G, rc_node_id, canonical_start, res.get('frontiers', []))
         cleanup_redundant_factored_nodes(G, factored_nodes, preserved_nodes)
 
     return G

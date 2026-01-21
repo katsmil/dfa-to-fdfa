@@ -3,7 +3,7 @@ import networkx as nx
 from pathlib import Path
 
 # Importeer de analyse logica
-from bisimilar._extended_with_frontier_detection import analyze_graph_factorization
+from bisimilar.analyze_bisimilar_substructures import run_analysis
 
 # Importeer de factorisatie logica
 from factorize.factorization_engine import apply_factorization, save_dot
@@ -23,7 +23,7 @@ def main():
         sys.exit(1)
 
     # 2. Analyse van substructuren
-    results = analyze_graph_factorization(input_file)
+    results = run_analysis(input_file)
         
     if not results:
         print("Geen factorisatie mogelijk.")
