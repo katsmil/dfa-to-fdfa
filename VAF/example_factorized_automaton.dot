@@ -8,8 +8,8 @@ digraph G {
   __start3 [label="" shape=none width=0 height=0];
   
   __start0 -> A;
-  __start1 -> 1;
-  __start3 -> sub_a_B1;
+  
+  
   A [fillcolor=lightgreen];
   F [shape=doublecircle, fillcolor=lightpink];
 
@@ -21,6 +21,7 @@ digraph G {
   sub_a_C1 -> sub_a_D1 [label="z"];
   sub_a_D1 -> sub_a_B1 [label="u"];
   sub_a_B1 -> sub_a_B1 [label="ε"];
+  __start3 -> sub_a_B1;
   
   RC_1 [shape=box, style=filled, fillcolor=orange, label="RC Sub_1"];
   RC_11 [shape=box, style=filled, fillcolor=orange, label="RC Sub_11"];
@@ -33,7 +34,8 @@ digraph G {
   1 -> 2 [label="u"];
   2 -> 3 [label="v"];
   3 -> 4 [label="w"];
-
+  __start1 -> 1;
+  
   // --- Verbindingen ---
   node [fillcolor=white]; // Reset kleur voor rest
   A -> RC_B1 [label="c"];
