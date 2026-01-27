@@ -1,0 +1,43 @@
+digraph G {
+  rankdir=LR;
+  node [fontname="Arial", style=filled]; // Standaard stijl voor alle knopen
+  
+   // --- Refactored Solution---
+ node [fillcolor="grey"];  
+  
+  __start2 [label="" shape=none width=0 height=0];
+  __start2 -> a01 [label="RC call"];
+  
+  a01 [label="a1"]; a02 [shape="doublecircle"label="a2"];
+  
+  a01 -> a01 [label="ε"];
+  a01 -> a02 [label="v"]
+ 
+  node [fillcolor="green"];
+ __start5 [label="" shape=none width=0 height=0];
+ __start5 -> a_sub01 [label=""];
+ a_sub01 [shape="box"label="Call: sub"]; a_sub02 [label="F1"];
+ a_sub05 [label="D1"]; a_sub06 [label="E1"];
+ a_sub03 [label="G1"]; a_sub04 [shape="doublecircle"label="F3"];
+ 
+ a_sub01 -> a_sub05 [label="z"];
+ a_sub01 -> a_sub06 [label="w"];
+ a_sub05 -> a_sub02 [label="i"];
+ a_sub06 -> a_sub03 [label="i"];
+ a_sub02 -> a_sub04 [label="#"];
+ a_sub03 -> a_sub04 [label="@"];
+ 
+ node [fillcolor="green"];
+ a_sub011 [shape="box" label="Call: sub"]; a_sub012 [label="O1"];
+ a_sub015 [label="M1"]; a_sub016 [label="N1"];
+ a_sub013 [label="P1"]; a_sub014 [shape="doublecircle"label="F4"];
+ __start4 [label="" shape=none width=0 height=0];
+ __start4 -> a_sub011 [label=""];
+
+ a_sub011 -> a_sub015 [label="z"];
+ a_sub011 -> a_sub016 [label="w"];
+ a_sub015 -> a_sub012 [label="i"];
+ a_sub016 -> a_sub013 [label="i"];
+ a_sub012 -> a_sub014 [label="$"];
+ a_sub013 -> a_sub014 [label="/"];
+}
