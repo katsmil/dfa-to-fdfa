@@ -1,7 +1,7 @@
 from typing import List
 import networkx as nx
 from collections import deque
-from bisimilar.analyze_bisimilar_substructures import SubstructureMatch
+from bisimilar.analyze_ext_bisimilar_substructures import SubstructureMatch
 
 def _get_out_labels(G, node):
     """Hulpfunctie om labels van uitgaande transities te verzamelen."""

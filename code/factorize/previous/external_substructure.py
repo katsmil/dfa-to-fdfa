@@ -1,6 +1,6 @@
 from typing import List, Set
 import networkx as nx
-from bisimilar.analyze_bisimilar_substructures import SubstructureMatch
+from bisimilar.analyze_ext_bisimilar_substructures import SubstructureMatch
 
 def create_recursive_call_node(G, factored_start, canonical_start):
     """Maakt de oranje RC-knoop aan die de substructuur vervangt."""
