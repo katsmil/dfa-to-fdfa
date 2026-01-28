@@ -3,10 +3,10 @@ import networkx as nx
 from pathlib import Path
 
 # Importeer de analyse logica
-from bisimilar.analyze_bisimilar_substructures import run_analysis
+from bisimilar.WIP import run_analysis
 
 # Importeer de factorisatie logica
-from factorize.bisim_factorization import apply_factorization, save_dot
+from factorize.WIP import apply_factorization, save_dot
 
 def main():
     if len(sys.argv) < 2:
