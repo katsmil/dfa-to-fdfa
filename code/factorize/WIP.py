@@ -46,10 +46,6 @@ def _is_valid_entry_structure(G: nx.DiGraph, start_node: str, instance_nodes: Se
                 return False
     return True
 
-from collections import defaultdict
-
-from collections import defaultdict
-
 def _process_transitions_and_update_subroutine(
     G: nx.DiGraph,
     instance_nodes: Set[str],
