@@ -96,7 +96,7 @@ class SubstructureAnalyzer:
 
     def find_maximal_overlap(self, start_a: str, start_b: str) -> Optional[SubstructureMatch]:
         # 1. Initiële match check
-        if start_a == start_b or not self._check_strict_match(start_a, start_b):
+        if not self._check_strict_match(start_a, start_b):
             return None
 
         # 2. BFS om de volledige bisimilaire set te vinden
@@ -113,9 +113,6 @@ class SubstructureAnalyzer:
                 continue
 
             n1, n2 = pair
-            if n1 == n2:
-                continue
-
             if self._check_strict_match(n1, n2):
                 bisimilar_pairs.add(pair)
                 nodes_in_a.add(n1)

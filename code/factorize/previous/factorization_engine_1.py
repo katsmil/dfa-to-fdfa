@@ -1,7 +1,7 @@
 import networkx as nx 
 from typing import List, Set, Dict
 from collections import defaultdict
-from bisimilar.WIP import SubstructureMatch
+from bisimilar.previous.analyzer_0 import SubstructureMatch
 
 # --- HULPFUNCTIES --- 
 def _get_out_labels(G: nx.DiGraph, node: str) -> Dict[str, str]: 
@@ -46,71 +46,48 @@ def _is_valid_entry_structure(G: nx.DiGraph, start_node: str, instance_nodes: Se
                 return False
     return True
 
-from collections import defaultdict
-
-from collections import defaultdict
-
 def _process_transitions_and_update_subroutine(
     G: nx.DiGraph,
     instance_nodes: Set[str],
     sub_mapping: Dict[str, str],
     rc_node_id: str
 ):
-    """
-    Bouwt de interne mapping op de RC node.
-    Mapping structuur: { label: { SUB_node_id: target_node_in_main } }
-    """
-    # De interne dispatch tabel
-    # We gebruiken de sub_node ID's voor de mapping
-    dispatch_map = defaultdict(dict)
+    """Verwerkt transities en werkt de subroutine-definitie bij."""
+    # Set om bij te houden welke (label, target) we al hebben toegevoegd aan deze RC node
+    processed_exits = set()
 
     for inst_node in instance_nodes:
         sub_node = sub_mapping.get(inst_node)
-        if not sub_node: continue
-        
+        if not sub_node:
+            continue
+
+        sub_out_labels = _get_out_labels(G, sub_node)
+
         for _, target, data in list(G.out_edges(inst_node, data=True)):
             label = data.get("label")
             if not label: continue
 
-            # EXIT: Transitie naar buiten de subroutine-instantie
+            # EXIT: Transitie naar buiten de instantie
             if target not in instance_nodes:
-                # Cruciaal: We mappen de label aan de SUB_node ID
-                dispatch_map[label][sub_node] = target
-                
-                # Voeg de transitie toe aan de RC node (puur label)
-                if not G.has_edge(rc_node_id, target, key=label):
-                    G.add_edge(rc_node_id, target, label=label, key=label)
+                # Check of we deze specifieke uitgang (label + doel) al getekend hebben vanaf de RC
+                exit_id = (label, target)
+                if exit_id not in processed_exits:
+                    G.add_edge(rc_node_id, target, **data)
+                    processed_exits.add(exit_id)
 
-                # Update de status van de subroutine-node
+                # Update de status van de subroutine-node (idempotent)
                 G.nodes[sub_node].update({
                     "peripheries": 2, "status": "accepting",
                     "fillcolor": "lightblue", "style": "filled",
                 })
-            
-            # INTERN: De interne logica van de subroutine (blueprint)
+
+            # INTERN: Voeg pad toe aan subroutine indien nieuw
             else:
-                sub_target = sub_mapping.get(target)
-                sub_out_labels = _get_out_labels(G, sub_node)
-                if label not in sub_out_labels and sub_target:
-                    G.add_edge(sub_node, sub_target, **data)
-
-    # Sla de map op als attribuut (voor de stack-machine logica)
-    G.nodes[rc_node_id]['dispatch_map'] = dict(dispatch_map)
-
-    # Visuele weergave op de RC node voor de DOT-file
-    visual_map = []
-    for label, sub_nodes_dict in dispatch_map.items():
-        # Sorteer de SUB_ namen voor een consistente weergave
-        sub_names = ", ".join(sorted(sub_nodes_dict.keys()))
-        # Gebruik dubbele quotes rond het label voor de duidelijkheid
-        visual_map.append(f'"{label}": {sub_names}')
-    
-    # Gebruik \n in plaats van | voor een verticale lijst
-    mapping_str = "\\n".join(visual_map)
-    current_label = G.nodes[rc_node_id].get('label', 'RC')
-    
-    # We zetten de mapping tussen vierkante haken op nieuwe regels
-    G.nodes[rc_node_id]['label'] = f"{current_label}\\n[{mapping_str}]"
+                if label not in sub_out_labels:
+                    sub_target = sub_mapping.get(target)
+                    if sub_target:
+                        G.add_edge(sub_node, sub_target, **data)
+                        sub_out_labels[label] = sub_target
 
 def _replace_instance_with_rc(G: nx.DiGraph,
                              start_node: str,
