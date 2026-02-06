@@ -1,10 +1,30 @@
 {
     "configurations": [
         {
-            "name": "Main - Recognize and Factorize Substructures",
+            "name": "EquivalenceClosure",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/main.py",
+            "program": "${workspaceFolder}/code/EquivalenceClosure/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "${input:inputFile}"
+            ]
+        },
+        {
+            "name": "Main_2 - Recognize and Factorize Substructures",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/code/main_new_2.py",
+            "console": "integratedTerminal",
+            "args": [
+                "${input:inputFile}"
+            ]
+        },
+        {
+            "name": "No EquivalenceClosure",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/code/No_EquivalenceClosure/main.py",
             "console": "integratedTerminal",
             "args": [
                 "${input:inputFile}"

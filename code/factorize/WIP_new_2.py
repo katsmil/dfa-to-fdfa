@@ -1,7 +1,7 @@
 import networkx as nx 
 from typing import List, Set, Dict
 from collections import defaultdict
-from bisimilar.WIP import SubstructureMatch
+from bisimilar.WIP_new_2 import CanonicalSubstructure
 
 # --- HULPFUNCTIES --- 
 def _get_out_labels(G: nx.DiGraph, node: str) -> Dict[str, str]: 
@@ -148,38 +148,69 @@ def _is_deterministic_with_subroutine(G: nx.DiGraph,
                         return False
     return True
 
-def apply_factorization(G: nx.DiGraph, results: List[SubstructureMatch]):
+def apply_factorization(G: nx.DiGraph, results: List[CanonicalSubstructure]):
     all_nodes_to_remove = set()
-    processed_starts = set() 
-    
-    groups = defaultdict(list)
-    for res in results:
-        groups[res.start_nodes[0]].append(res)
-        
-    sorted_canonicals = sorted(groups.keys(), key=lambda k: groups[k][0].overlap_size, reverse=True)
+    processed_nodes = set() 
 
-    for i, canonical_start in enumerate(sorted_canonicals):
-        matches = groups[canonical_start]
-        sub_name = f"Sub_{canonical_start}"
-        nodes_blueprint = {p[0] for p in matches[0].all_pairs}
+    for i, sub in enumerate(results):
+        base_start_node = sub.canonical_nodes[0]
+        sub_name = f"Sub_{base_start_node}"
         
-        if _is_valid_entry_structure(G, canonical_start, nodes_blueprint):
-            # 1. Initialiseer de Subroutine (Blauwdruk)
-            _, global_sub_mapping = create_subroutine_structure(G, nodes_blueprint, i, canonical_start)
+        # Mapping voorbereiden voor validatie
+        global_sub_mapping = {node: f"SUB_{base_start_node}_{node}" for node in sub.canonical_nodes}
+        
+        # --- STAP 1: PRE-SCAN (Validatie van de gehele groep) ---
+        valid_locations_to_process = []
+        is_group_valid = True
+
+        for loc in sub.locations:
+            # Check overlap
+            if any(n in processed_nodes for n in loc.all_nodes):
+                # Als een locatie al (deels) bezet is, is dit hele patroon niet meer optimaal
+                is_group_valid = False
+                break
             
-            for m in matches:
-                for idx, start_node in enumerate(m.start_nodes):
-                    if start_node not in processed_starts:
-                        current_nodes = {p[idx] for p in m.all_pairs}
-                        current_mapping = {p[idx]: global_sub_mapping[p[0]] for p in m.all_pairs}
-                        
-                        if _is_valid_entry_structure(G, start_node, current_nodes):
-                            if _is_deterministic_with_subroutine(G, current_nodes, current_mapping):
-                                to_rem = _replace_instance_with_rc(G, start_node, current_nodes, sub_name, current_mapping)
-                                all_nodes_to_remove.update(to_rem)
-                                processed_starts.add(start_node)
-                            else:
-                                print(f"Skipping instantie {start_node}: veroorzaakt nondeterminisme in subroutine.")
+            start_node = loc.all_nodes[0]
+            instance_nodes = set(loc.all_nodes)
+            current_mapping = dict(zip(loc.all_nodes, 
+                                       [global_sub_mapping[cn] for cn in sub.canonical_nodes]))
+
+            # Check technische validiteit
+            if _is_valid_entry_structure(G, start_node, instance_nodes) and \
+               _is_deterministic_with_subroutine(G, instance_nodes, current_mapping):
+                valid_locations_to_process.append((start_node, instance_nodes, current_mapping))
+            else:
+                # Eén locatie is ongeldig -> we wijzen de hele groep af
+                is_group_valid = False
+                break
+
+        # --- STAP 2: COMMIT (Alleen als de hele groep valide is) ---
+        if is_group_valid and len(valid_locations_to_process) >= 2:
+            # Nu pas bouwen we de subroutine fysiek in de graaf
+            create_subroutine_structure(
+                G, 
+                set(sub.canonical_nodes), 
+                i, 
+                base_start_node
+            )
+
+            for start_node, instance_nodes, current_mapping in valid_locations_to_process:
+                _replace_instance_with_rc(
+                    G, 
+                    start_node, 
+                    instance_nodes, 
+                    sub_name, 
+                    current_mapping
+                )
+                
+                all_nodes_to_remove.update(instance_nodes)
+                processed_nodes.update(instance_nodes)
+            
+            print(f"Succes: Structuur {sub_name} gefactoriseerd op {len(valid_locations_to_process)} locaties.")
+        else:
+            # Groep afgewezen: nodes blijven 'vrij' voor volgende items op de prio-lijst
+            if not is_group_valid:
+                print(f"Overgeslagen: Structuur {sub_name} bevat ongeldige of overlappende locaties.")
 
     G.remove_nodes_from(all_nodes_to_remove)
     return G
