@@ -1,43 +1,135 @@
-import networkx as nx 
-from typing import List, Set, Dict
+import networkx as nx
 from collections import defaultdict
+from typing import List, Set, Dict
 from analyze import CanonicalSubstructure
 
-# --- HULPFUNCTIES --- 
-def _get_out_labels(G: nx.DiGraph, node: str) -> Dict[str, str]: 
-    """Geeft een dictionary van label -> target_node.""" 
-    return {data.get('label'): target for _, target, data in G.out_edges(node, data=True) if 'label' in data} 
+def create_subroutine_structure(G: nx.MultiDiGraph, sub: CanonicalSubstructure, sub_id: int):
+    """
+    Bouwt de abstracte subroutine op basis van de blueprint.
+    """
+    cluster_name = f"subroutine_{sub_id}"
+    # Index 0 is ALTIJD de entry node (gegarandeerd door Analyse BFS)
+    sub_mapping = {i: f"SUB_{sub_id}_{i}" for i in range(sub.nodes_count)}
 
-# --- SUBROUTINE LOGICA --- 
-def create_subroutine_structure(G: nx.DiGraph, 
-                                canonical_nodes: Set[str],
-                                cluster_id: int, 
-                                canonical_start: str):
-    """Initialiseert de externe subroutine structuur."""
-    sub_mapping = {node: f"SUB_{canonical_start}_{node}" for node in canonical_nodes}
-    cluster_name = f"subroutine_{canonical_start}_{cluster_id}"
+    for i, sub_node in sub_mapping.items():
+        G.add_node(sub_node, cluster=cluster_name, label=f"S{i}")
 
-    for orig_node, sub_node in sub_mapping.items():
-        attrs = G.nodes[orig_node].copy() if orig_node in G.nodes else {}
-        attrs.update({'cluster': cluster_name, 'label': f"{orig_node}"})
-        G.add_node(sub_node, **attrs)
+    # Dummy start pijl naar S0
+    start_dummy = f"__start_{cluster_name}"
+    G.add_node(start_dummy, label="", shape="none", width="0", height="0", cluster=cluster_name)
+    G.add_edge(start_dummy, sub_mapping[0])
 
-    if canonical_start in sub_mapping:
-        start_dummy = f"__start_{cluster_name}"
-        G.add_node(start_dummy, label="", shape="none", width="0", height="0", cluster=cluster_name)
-        G.add_edge(start_dummy, sub_mapping[canonical_start])
-
-    # Initiële interne edges op basis van de blueprint
-    for orig_node in canonical_nodes:
-        sub_source = sub_mapping[orig_node]
-        for _, orig_target, data in list(G.out_edges(orig_node, data=True)):
-            if orig_target in canonical_nodes:
-                G.add_edge(sub_source, sub_mapping[orig_target], **data)
+    # Bouw interne transities strikt volgens blueprint
+    for edge in sub.blueprint_edges:
+        G.add_edge(sub_mapping[edge.source_idx], sub_mapping[edge.target_idx], label=edge.label)
 
     return cluster_name, sub_mapping
 
-# --- FACTORISATIE KERN --- 
-def _is_valid_entry_structure(G: nx.DiGraph, start_node: str, instance_nodes: Set[str]) -> bool:
+def _process_exits(G: nx.MultiDiGraph, instance_nodes: Set[str], sub_map: Dict[str, str], rc_id: str):
+    """Handelt transities af die de subroutine verlaten."""
+    dispatch_map = defaultdict(dict)
+    
+    for inst_node in instance_nodes:
+        sub_node = sub_map[inst_node]
+        for _, target, data in list(G.out_edges(inst_node, data=True)):
+            label = data.get('label')
+            if target not in instance_nodes:
+                # Markeer de exit in de dispatch_map
+                dispatch_map[label][sub_node] = target
+                
+                # Voeg edge toe vanaf RC naar de target in de hoofdgraaf
+                if not G.has_edge(rc_id, target, key=label):
+                    G.add_edge(rc_id, target, label=label, key=label)
+                
+                # Maak de exit node in de subroutine visueel herkenbaar (accepting state)
+                G.nodes[sub_node].update({"peripheries": 2, "fillcolor": "lightblue", "style": "filled"})
+
+    # Update RC label met de dispatch tabel (visueel)
+    visual_rows = [f'"{l}": {", ".join(nodes.keys())}' for l, nodes in dispatch_map.items()]
+    mapping_str = "\\n".join(visual_rows)
+    # Alleen toevoegen als er exits zijn, anders blijft het label schoon
+    if mapping_str:
+        G.nodes[rc_id]['label'] = f"{G.nodes[rc_id]['label']}\\n[{mapping_str}]"
+
+def apply_factorization(G: nx.MultiDiGraph, results: List[CanonicalSubstructure]):
+    """
+    Past factorisatie toe. Filtert per locatie op overlap (globaal én lokaal) en geldigheid.
+    Commit alleen als er >= 2 geldige locaties overblijven.
+    """
+    processed_nodes = set() # Houdt bij welke nodes AL VERWIJDERD zijn door eerdere subroutines
+    nodes_to_remove = set()
+
+    print(f"Start factorisatie met {len(results)} kandidaat-structuren...")
+
+    for i, sub in enumerate(results):
+        sub_id = i
+        valid_locations_to_process = []
+        
+        # Houdt bij welke nodes we claimen voor DEZE specifieke subroutine (om interne overlap te voorkomen)
+        nodes_in_current_batch = set()
+
+        # --- FILTER FASE ---
+        for loc in sub.locations:
+            loc_nodes_set = set(loc.all_nodes)
+
+            # CHECK 1: Globale Overlap
+            # Is een van deze nodes al gebruikt in een VORIGE factorisatie?
+            if any(n in processed_nodes for n in loc_nodes_set):
+                continue
+
+            # CHECK 2: Lokale Overlap
+            # Overlapt deze locatie met een locatie die we Zojuist in deze lus hebben goedgekeurd?
+            if any(n in nodes_in_current_batch for n in loc_nodes_set):
+                continue
+
+            # CHECK 3: Valide Entry?
+            # Kan de graaf hier netjes losgeknipt worden?
+            if not _is_valid_entry_structure(G, loc.start_node, loc_nodes_set):
+                continue
+
+            # Als we hier zijn, is de locatie geldig en vrij.
+            valid_locations_to_process.append(loc)
+            nodes_in_current_batch.update(loc_nodes_set)
+
+        # --- COMMIT FASE ---
+        # We gaan pas bouwen als we minimaal 2 valide locaties overhouden
+        if len(valid_locations_to_process) >= 2:
+            # 1. Bouw de subroutine 'echt' in de graaf
+            cluster_name, sub_mapping = create_subroutine_structure(G, sub, sub_id)
+            
+            print(f"  > Subroutine {sub_id} toegepast op {len(valid_locations_to_process)} locaties.")
+
+            for loc in valid_locations_to_process:
+                rc_id = f"RC_{loc.start_node}"
+                G.add_node(rc_id, shape='box', style='filled', fillcolor='orange', label=f"RC: {cluster_name}")
+                
+                # Mapping: Echte Node -> Subroutine Node (via Index)
+                instance_map = {node_name: sub_mapping[idx] for idx, node_name in enumerate(loc.all_nodes)}
+                
+                # 2. Buig inkomende transities om naar de RC node
+                for u, v, data in list(G.in_edges(loc.start_node, data=True)):
+                    if u not in loc.all_nodes:
+                        G.add_edge(u, rc_id, **data)
+                
+                # 3. Verwerk exits en update dispatch table
+                _process_exits(G, set(loc.all_nodes), instance_map, rc_id)
+            
+            # 4. Nu pas voegen we deze nodes toe aan de globale processed lijst
+            processed_nodes.update(nodes_in_current_batch)
+            nodes_to_remove.update(nodes_in_current_batch)
+        else:
+            # Als er na filtering < 2 overblijven, doen we niets met deze groep
+            pass
+
+    # Ruim alle vervangen nodes in één keer op
+    G.remove_nodes_from(nodes_to_remove)
+    return G
+
+# Helper voor validatie (uit je eerdere snippets)
+def _is_valid_entry_structure(G: nx.MultiDiGraph, start_node: str, instance_nodes: Set[str]) -> bool:
+    """
+    Controleert of de structuur alleen via de start_node wordt binnengegaan.
+    """
     for node in instance_nodes:
         if node == start_node:
             continue
@@ -46,180 +138,9 @@ def _is_valid_entry_structure(G: nx.DiGraph, start_node: str, instance_nodes: Se
                 return False
     return True
 
-def _process_transitions_and_update_subroutine(
-    G: nx.DiGraph,
-    instance_nodes: Set[str],
-    sub_mapping: Dict[str, str],
-    rc_node_id: str
-):
-    """
-    Bouwt de interne mapping op de RC node.
-    Mapping structuur: { label: { SUB_node_id: target_node_in_main } }
-    """
-    # De interne dispatch tabel
-    # We gebruiken de sub_node ID's voor de mapping
-    dispatch_map = defaultdict(dict)
-
-    for inst_node in instance_nodes:
-        sub_node = sub_mapping.get(inst_node)
-        if not sub_node: continue
-        
-        for _, target, data in list(G.out_edges(inst_node, data=True)):
-            label = data.get("label")
-            if not label: continue
-
-            # EXIT: Transitie naar buiten de subroutine-instantie
-            if target not in instance_nodes:
-                # Cruciaal: We mappen de label aan de SUB_node ID
-                dispatch_map[label][sub_node] = target
-                
-                # Voeg de transitie toe aan de RC node (puur label)
-                if not G.has_edge(rc_node_id, target, key=label):
-                    G.add_edge(rc_node_id, target, label=label, key=label)
-
-                # Update de status van de subroutine-node
-                G.nodes[sub_node].update({
-                    "peripheries": 2, "status": "accepting",
-                    "fillcolor": "lightblue", "style": "filled",
-                })
-            
-            # INTERN: De interne logica van de subroutine (blueprint)
-            else:
-                sub_target = sub_mapping.get(target)
-                sub_out_labels = _get_out_labels(G, sub_node)
-                if label not in sub_out_labels and sub_target:
-                    G.add_edge(sub_node, sub_target, **data)
-
-    # Sla de map op als attribuut (voor de stack-machine logica)
-    G.nodes[rc_node_id]['dispatch_map'] = dict(dispatch_map)
-
-    # Visuele weergave op de RC node voor de DOT-file
-    visual_map = []
-    for label, sub_nodes_dict in dispatch_map.items():
-        # Sorteer de SUB_ namen voor een consistente weergave
-        sub_names = ", ".join(sorted(sub_nodes_dict.keys()))
-        # Gebruik dubbele quotes rond het label voor de duidelijkheid
-        visual_map.append(f'"{label}": {sub_names}')
-    
-    # Gebruik \n in plaats van | voor een verticale lijst
-    mapping_str = "\\n".join(visual_map)
-    current_label = G.nodes[rc_node_id].get('label', 'RC')
-    
-    # We zetten de mapping tussen vierkante haken op nieuwe regels
-    G.nodes[rc_node_id]['label'] = f"{current_label}\\n[{mapping_str}]"
-
-def _replace_instance_with_rc(G: nx.DiGraph,
-                             start_node: str,
-                             instance_nodes: Set[str],
-                             subroutine_name: str,
-                             sub_mapping: Dict[str, str]) -> Set[str]:
-    rc_node_id = f"RC_{start_node}"
-
-    if not G.has_node(rc_node_id):
-        G.add_node(rc_node_id, shape='box', style='filled', fillcolor='orange',
-                   label=f"RC: {subroutine_name}")
-
-    # 1. Inkomende edges ombuigen
-    for u, v, data in list(G.in_edges(start_node, data=True)):
-        if u not in instance_nodes:
-            G.add_edge(u, rc_node_id, **data)
-
-    # 2. Exits naar RC verplaatsen en subroutine verrijken
-    _process_transitions_and_update_subroutine(G, instance_nodes, sub_mapping, rc_node_id)
-
-    return instance_nodes
-
-def _is_deterministic_with_subroutine(G: nx.DiGraph, 
-                                     instance_nodes: Set[str], 
-                                     sub_mapping: Dict[str, str]) -> bool:
-    for inst_node in instance_nodes:
-        sub_node = sub_mapping.get(inst_node)
-        if not G.has_node(sub_node):
-            continue
-
-        sub_out_labels = _get_out_labels(G, sub_node)
-        inst_out_edges = _get_out_labels(G, inst_node)
-
-        for label, inst_target in inst_out_edges.items():
-            if inst_target in instance_nodes:
-                sub_target_of_inst = sub_mapping.get(inst_target)
-                if label in sub_out_labels:
-                    if sub_out_labels[label] != sub_target_of_inst:
-                        return False
-    return True
-
-def apply_factorization(G: nx.DiGraph, results: List[CanonicalSubstructure]):
-    all_nodes_to_remove = set()
-    processed_nodes = set() 
-
-    for i, sub in enumerate(results):
-        # ===== ENIGE WIJZIGING: gebruik eerste locatie als blueprint =====
-        blueprint_nodes = sub.locations[0].all_nodes
-        # ===== EINDE WIJZIGING =====
-        base_start_node = blueprint_nodes[0]
-        sub_name = f"Sub_{base_start_node}"
-        
-        # Mapping voorbereiden op basis van de blueprint (example_nodes)
-        global_sub_mapping = {node: f"SUB_{base_start_node}_{node}" for node in blueprint_nodes}
-        
-        # --- STAP 1: PRE-SCAN ---
-        valid_locations_to_process = []
-        is_group_valid = True
-
-        for loc in sub.locations:
-            # Check overlap
-            if any(n in processed_nodes for n in loc.all_nodes):
-                is_group_valid = False
-                break
-            
-            # De start_node van deze specifieke locatie
-            start_node = loc.start_node 
-            instance_nodes = set(loc.all_nodes)
-            
-            # Maak een mapping tussen deze locatie en de subroutine-namen
-            # We ritsen de nodes van deze locatie aan de namen gegenereerd uit de blueprint
-            current_mapping = dict(zip(loc.all_nodes, 
-                                       [global_sub_mapping[bn] for bn in blueprint_nodes]))
-
-            # Check technische validiteit
-            if _is_valid_entry_structure(G, start_node, instance_nodes) and \
-               _is_deterministic_with_subroutine(G, instance_nodes, current_mapping):
-                valid_locations_to_process.append((start_node, instance_nodes, current_mapping))
-            else:
-                is_group_valid = False
-                break
-
-        # --- STAP 2: COMMIT ---
-        if is_group_valid and len(valid_locations_to_process) >= 2:
-            # Bouw de subroutine op basis van de blueprint (example_nodes)
-            create_subroutine_structure(
-                G, 
-                set(blueprint_nodes), 
-                i, 
-                base_start_node
-            )
-
-            for start_node, instance_nodes, current_mapping in valid_locations_to_process:
-                _replace_instance_with_rc(
-                    G, 
-                    start_node, 
-                    instance_nodes, 
-                    sub_name, 
-                    current_mapping
-                )
-                
-                all_nodes_to_remove.update(instance_nodes)
-                processed_nodes.update(instance_nodes)
-            
-            print(f"Succes: Structuur {sub_name} gefactoriseerd op {len(valid_locations_to_process)} locaties.")
-        else:
-            if not is_group_valid:
-                print(f"Overgeslagen: Structuur {sub_name} botst met een eerdere (betere) factorisatie.")
-
-    G.remove_nodes_from(all_nodes_to_remove)
-    return G
-
-def save_dot(G, filename):
-    """Slaat de graaf op als DOT-bestand."""
-    nx.drawing.nx_pydot.write_dot(G, filename)
-    print(f"Gefactoriseerde graaf opgeslagen als: {filename}")
+def save_dot(G: nx.MultiDiGraph, filename: str):
+    try:
+        nx.drawing.nx_pydot.write_dot(G, filename)
+        print(f"Gefactoriseerde graaf opgeslagen: {filename}")
+    except Exception as e:
+        print(f"Fout bij opslaan: {e}")

@@ -21,6 +21,7 @@ class CanonicalSubstructure:
     locations: List[MatchLocation]
     blueprint_edges: List[BlueprintEdge]
     nodes_count: int
+    effective_count: int  # Nieuw: Aantal niet-overlappende locaties
 
 class SubstructureAnalyzer:
     def __init__(self, G: nx.MultiDiGraph, min_overlap: int = 2):
@@ -34,14 +35,34 @@ class SubstructureAnalyzer:
         return (is_accepting, tuple([(l, v == node) for l, v in edges]))
 
     def find_maximal_overlap(self, start_a: str, start_b: str) -> Optional[Dict]:
+        # EXPLICIETE CHECK: Starten op dezelfde node heeft geen zin
+        if start_a == start_b:
+            return None
+
         queue = deque([(start_a, start_b)])
-        visited_pairs = [] # Behoudt BFS volgorde: Index 0 is Start
+        visited_pairs = [] 
         pair_set = set()
+        
+        # Houd bij welke nodes aan welke "kant" van de vergelijking zitten
+        nodes_in_a = set()
+        nodes_in_b = set()
 
         while queue:
             pair = queue.popleft()
             if pair in pair_set: continue
+            
             n1, n2 = pair
+            
+            # 1. IDENTITEITS CHECK: Als de BFS bij dezelfde node uitkomt, 
+            # stopt de bisimilaire overlap hier.
+            if n1 == n2:
+                continue
+
+            # 2. INTERNE OVERLAP CHECK: 
+            # Voorkom dat kant A van de match nodes van kant B gaat bevatten en vice versa.
+            # Dit voorkomt dat een pad dat in zichzelf draait als "herhaling" wordt gezien.
+            if n1 in nodes_in_b or n2 in nodes_in_a:
+                return None
 
             # Check of ze lokaal bisimilair zijn
             sig1 = self.get_node_signature(n1)
@@ -50,13 +71,16 @@ class SubstructureAnalyzer:
             if sig1 == sig2:
                 visited_pairs.append(pair)
                 pair_set.add(pair)
+                nodes_in_a.add(n1)
+                nodes_in_b.add(n2)
                 
-                e1 = {d['label']: v for _, v, d in self.G.out_edges(n1, data=True)}
-                e2 = {d['label']: v for _, v, d in self.G.out_edges(n2, data=True)}
+                e1 = {d.get('label'): v for _, v, d in self.G.out_edges(n1, data=True)}
+                e2 = {d.get('label'): v for _, v, d in self.G.out_edges(n2, data=True)}
                 
-                for label, next_n1 in e1.items():
+                # Labels matchen
+                for label in sorted(e1.keys()):
                     if label in e2:
-                        queue.append((next_n1, e2[label]))
+                        queue.append((e1[label], e2[label]))
 
         if len(visited_pairs) < self.min_overlap:
             return None
@@ -69,20 +93,31 @@ class SubstructureAnalyzer:
         for idx, n1 in enumerate(nodes_a):
             for _, target, d in self.G.out_edges(n1, data=True):
                 if target in node_to_idx:
-                    blueprint_edges.append(BlueprintEdge(idx, node_to_idx[target], d['label']))
+                    blueprint_edges.append(BlueprintEdge(idx, node_to_idx[target], d.get('label')))
 
         return {
             'nodes_a': tuple(nodes_a),
             'nodes_b': tuple([p[1] for p in visited_pairs]),
             'blueprint_edges': list(set(blueprint_edges))
         }
+    
+def _calculate_effective_count(locations: List[MatchLocation]) -> int:
+    count = 0
+    claimed_nodes = set()
+    # Sorteer op start_node voor een voorspelbare greedy selectie
+    for loc in sorted(locations, key=lambda l: l.start_node):
+        if not any(n in claimed_nodes for n in loc.all_nodes):
+            count += 1
+            claimed_nodes.update(loc.all_nodes)
+    return count
 
 def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[CanonicalSubstructure]:
     analyzer = SubstructureAnalyzer(G, min_overlap=min_size)
     buckets = defaultdict(list)
     for node in G.nodes():
         buckets[analyzer.get_node_signature(node)].append(node)
-    
+    buckets = {k: v for k, v in buckets.items() if len(v) >= 2} 
+
     structure_registry = defaultdict(set)
     blueprint_store = {}
 
@@ -101,15 +136,22 @@ def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[CanonicalSubstru
                     blueprint_store[struct_hash] = match['blueprint_edges']
 
     results = []
+    
     for s_hash, locations in structure_registry.items():
         edges = blueprint_store[s_hash]
         loc_list = list(locations)
+        
+        # Bereken de effectieve count voor de prioriteit
+        eff_count = _calculate_effective_count(loc_list)
+        
         results.append(CanonicalSubstructure(
             structure_hash=str(s_hash),
             overlap_size=len(loc_list[0].all_nodes),
             locations=loc_list,
             blueprint_edges=edges,
-            nodes_count=len(loc_list[0].all_nodes)
+            nodes_count=len(loc_list[0].all_nodes),
+            effective_count=eff_count
         ))
     
-    return sorted(results, key=lambda x: (x.overlap_size * len(x.locations)), reverse=True)
+    # Sortering op basis van de nieuwe effective_count
+    return sorted(results, key=lambda x: (x.overlap_size * x.effective_count), reverse=True)
