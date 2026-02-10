@@ -31,6 +31,16 @@
             ]
         },
         {
+            "name": "No EquivalenceClosure - extended with NDM check",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/code/No_EquivalenceClosure/extended_with_NDM_check/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "${input:inputFile}"
+            ]
+        },
+        {
             "name": "Determine iso between regions found by dominator theory",
             "type": "debugpy",
             "request": "launch",
