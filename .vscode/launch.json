@@ -31,10 +31,10 @@
             ]
         },
         {
-            "name": "No EquivalenceClosure - extended with NDM check",
+            "name": "No EquivalenceClosure - exclusive frontiers",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/No_EquivalenceClosure/extended_with_NDM_check/main.py",
+            "program": "${workspaceFolder}/code/No_EquivalenceClosure/exclusive_frontiers/main.py",
             "console": "integratedTerminal",
             "args": [
                 "${input:inputFile}"
