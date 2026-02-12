@@ -18,8 +18,8 @@ def main():
         print(f"Fout bij inlezen bestand: {e}")
         sys.exit(1)
     
-    # 2. Analyse van substructuren - GEEF G_orig DOOR, NIET input_file
-    results = run_analysis(G_orig)  # <--- DIT WAS DE FIX
+    # 2. Analyse van substructuren
+    results = run_analysis(G_orig)
     
     if not results:
         print("Geen factorisatie mogelijk.")
