@@ -26,7 +26,7 @@ def main():
         sys.exit(1)
 
     # 2. Analyse van substructuren
-    results = run_analysis(input_file)
+    results = run_analysis(G_orig)
         
     if not results:
         print("Geen factorisatie mogelijk.")

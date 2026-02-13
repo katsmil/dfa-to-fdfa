@@ -13,19 +13,49 @@ from typing import List, Dict, Tuple
 import json
 import sys
 import os
+import importlib.util
 
 # CRITICAL FIX: Add project root to Python path
 # This must happen BEFORE any custom imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)  # Should be .../code/
 
-# Use insert(0) to give priority to our modules
-sys.path.insert(0, project_root)
-
-# Debug: Verify paths (comment out after testing)
-print(f"DEBUG: Current dir: {current_dir}")
-print(f"DEBUG: Project root (added to path): {project_root}")
-print(f"DEBUG: Looking for modules in: {project_root}")
+# Setup variant module loaders
+def load_variant_module(variant: str, module_name: str, analyze_module=None):
+    """
+    Laad dynamisch een analyze/factorize module voor een variant.
+    Dit vermijdt relative import problemen door modules in sys.modules in te spuiten.
+    
+    Args:
+        variant: 'NoEquivalenceClosure' or 'EquivalenceClosure'
+        module_name: 'analyze' or 'factorize'
+        analyze_module: (optional) Al geladen analyze module (nodig voor factorize)
+    """
+    if variant == 'NoEquivalenceClosure':
+        module_path = os.path.join(
+            project_root, "approaches", "no_equivalence_closure", 
+            "exclusive_frontiers", "optimized", f"{module_name}.py"
+        )
+    else:  # EquivalenceClosure
+        module_path = os.path.join(
+            project_root, "approaches", "equivalence_closure", 
+            "optimized", f"{module_name}.py"
+        )
+    
+    module_name_unique = f"{variant}_{module_name}"
+    spec = importlib.util.spec_from_file_location(module_name_unique, module_path)
+    module = importlib.util.module_from_spec(spec)
+    
+    # Voeg toe aan sys.modules zodat relative imports werken
+    sys.modules[module_name_unique] = module
+    
+    # Als dit factorize is en we hebben analyze, inject het
+    if module_name == 'factorize' and analyze_module is not None:
+        sys.modules['analyze'] = analyze_module
+    
+    spec.loader.exec_module(module)
+    
+    return module
 
 @dataclass
 class BenchmarkResult:
@@ -37,7 +67,7 @@ class BenchmarkResult:
     
     # Effectiviteit
     structures_found: int
-    total_locations: int
+    # total_locations: int
     nodes_before: int
     nodes_after: int
     edges_before: int
@@ -77,34 +107,24 @@ class BenchmarkSuite:
         # ANALYSIS PHASE
         start_analysis = time.time()
         try:
-            if variant == 'NoEquivalenceClosure':
-                from No_EquivalenceClosure.exclusive_frontiers.optimized.analyze import run_analysis
-                structures = run_analysis(graph.copy(), min_size=2)
-            else:
-                from EquivalenceClosure.optimized.analyze import run_analysis as run_analysis_eq
-                structures = run_analysis_eq(graph.copy(), min_size=2)
-        except ImportError as e:
-            print(f"\n❌ Import Error in {variant}:")
+            analyze_module = load_variant_module(variant, 'analyze')
+            structures = analyze_module.run_analysis(graph.copy(), min_size=2)
+        except Exception as e:
+            print(f"\n❌ Error loading analyze module for {variant}:")
             print(f"   {e}")
-            print(f"\n   Expected module path from: {project_root}")
-            if variant == 'NoEquivalenceClosure':
-                expected = os.path.join(project_root, "No_EquivalenceClosure", "exclusive_frontiers", "optimized", "analyze.py")
-            else:
-                expected = os.path.join(project_root, "EquivalenceClosure", "optimized", "analyze.py")
-            print(f"   Looking for: {expected}")
-            print(f"   File exists: {os.path.exists(expected)}")
             raise
             
         analysis_time = time.time() - start_analysis
         
         # FACTORIZATION PHASE
         start_fact = time.time()
-        if variant == 'NoEquivalenceClosure':
-            from No_EquivalenceClosure.exclusive_frontiers.optimized.factorize import apply_factorization
-            factored_graph = apply_factorization(graph.copy(), structures)
-        else:
-            from EquivalenceClosure.optimized.factorize import apply_factorization as apply_eq
-            factored_graph = apply_eq(graph.copy(), structures)
+        try:
+            factorize_module = load_variant_module(variant, 'factorize', analyze_module=analyze_module)
+            factored_graph = factorize_module.apply_factorization(graph.copy(), structures)
+        except Exception as e:
+            print(f"\n❌ Error loading factorize module for {variant}:")
+            print(f"   {e}")
+            raise
         factorization_time = time.time() - start_fact
         
         total_time = time.time() - start_total
@@ -132,7 +152,7 @@ class BenchmarkSuite:
             factorization_time=factorization_time,
             total_time=total_time,
             structures_found=len(structures),
-            total_locations=sum(len(s.locations) for s in structures),
+            # total_locations=sum(len(s.locations) for s in structures),
             nodes_before=nodes_before,
             nodes_after=nodes_after,
             edges_before=edges_before,
@@ -203,10 +223,10 @@ class BenchmarkSuite:
             better_compression = "NoEquiv" if no_eq.compression_ratio < eq.compression_ratio else "Equiv"
             report.append(f"  → Better compression: {better_compression}")
             
-            # KWALITEIT
-            report.append(f"\n🎯 QUALITY:")
-            report.append(f"  NoEquiv:  {no_eq.structures_found} structures, {no_eq.total_locations} locations")
-            report.append(f"  Equiv:    {eq.structures_found} structures, {eq.total_locations} locations")
+            # # KWALITEIT
+            # report.append(f"\n🎯 QUALITY:")
+            # report.append(f"  NoEquiv:  {no_eq.structures_found} structures, {no_eq.total_locations} locations")
+            # report.append(f"  Equiv:    {eq.structures_found} structures, {eq.total_locations} locations")
             
             # CORRECTHEID
             report.append(f"\n✅ CORRECTNESS:")
@@ -251,16 +271,85 @@ def load_graph(input_file: str) -> nx.MultiDiGraph:
         raise
 
 
+def load_test_configs_from_directory(directory: str, label_prefix: str = "") -> List[Tuple[str, str]]:
+    """
+    Laadt alle .dot files uit een directory als test configs.
+    Retourneert een list van (name, filepath) tuples.
+    """
+    import glob
+    
+    # Vind alle .dot files in de directory
+    dot_files = sorted(glob.glob(os.path.join(directory, "*.dot")))
+    
+    configs = []
+    for filepath in dot_files:
+        # Extract filename without extension
+        filename = os.path.basename(filepath)
+        name = os.path.splitext(filename)[0]
+        
+        # Voeg optioneel prefix toe
+        if label_prefix:
+            name = f"{label_prefix}_{name}"
+        
+        configs.append((name, filepath))
+    
+    return configs
+
+
 # VOORBEELDGEBRUIK
 if __name__ == "__main__":
     suite = BenchmarkSuite()
     
-    # Test configurations
-    test_configs = [
-        ("bigSmall", "/Users/milcokats/Projects/Compression Cyclic DFA/input/joshua/bigSmall.dot"),
-        ("differentEntries", "/Users/milcokats/Projects/Compression Cyclic DFA/input/joshua/differentEntries.dot"),
-        ("fourComponents", "/Users/milcokats/Projects/Compression Cyclic DFA/input/joshua/fourComponents.dot")
-    ]
+    # ============================================
+    # TEST CONFIGURATIONS - KIES HIERONDER
+    # ============================================
+    # Wijzig TEST_MODE om te switchen tussen test scenarios:
+    # - 'joshua'           : Kleine, snelle testen (joshua voorbeelden)
+    # - 'large'           : Grotere real-world voorbeelden (url_parser, etc.)
+    # - 'test_automata'   : Alle deel_*.dot files uit input/test_automata/
+    # - 'custom'          : Aangepaste list - voeg je eigen testen toe
+    TEST_MODE = 'joshua'  # ← WIJZIG DEZE LIJN
+    
+    if TEST_MODE == 'joshua':
+        # Kleine testcases voor snelle feedback
+        test_configs = [
+            ("bigSmall", "/Users/milcokats/Projects/Compression Cyclic DFA/input/joshua/bigSmall.dot"),
+            ("differentEntries", "/Users/milcokats/Projects/Compression Cyclic DFA/input/joshua/differentEntries.dot"),
+            ("fourComponents", "/Users/milcokats/Projects/Compression Cyclic DFA/input/joshua/fourComponents.dot"),
+            ("multipleExits2", "/Users/milcokats/Projects/Compression Cyclic DFA/input/joshua/multipleExits2.dot"),
+            ("commonState", "/Users/milcokats/Projects/Compression Cyclic DFA/input/joshua/commonState.dot")
+        ]
+        print("📊 Mode: QUICK (kleine testcases)")
+        
+    elif TEST_MODE == 'large':
+        # Grotere real-world voorbeelden
+        test_configs = [
+            ("url_parser", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world_examples/url_parser.dot"),
+            # Voeg hier meer grote files toe:
+            # ("other_large", "/path/to/other_large.dot"),
+        ]
+        print("📊 Mode: LARGE (real-world voorbeelden)")
+        
+    elif TEST_MODE == 'test_automata':
+        # Alle test_automata voorbeelden (deel_1.dot t/m deel_11.dot)
+        test_automata_dir = "/Users/milcokats/Projects/Compression Cyclic DFA/input/test_automata"
+        test_configs = load_test_configs_from_directory(test_automata_dir)
+        print("📊 Mode: TEST_AUTOMATA (deel_1.dot - deel_11.dot)")
+        
+    elif TEST_MODE == 'custom':
+        # Zelf je combinatie samenstellen
+        test_configs = [
+            ("bigSmall", "/Users/milcokats/Projects/Compression Cyclic DFA/input/joshua/bigSmall.dot"),
+            ("url_parser", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world_examples/url_parser.dot"),
+            # Voeg je test cases hier toe
+        ]
+        print("📊 Mode: CUSTOM (zelf samengesteld)")
+    
+    else:
+        raise ValueError(f"Onbekende TEST_MODE: {TEST_MODE}")
+    
+    print(f"Tests: {len(test_configs)}")
+    print("="*80)
     
     for name, path in test_configs:
         print(f"\n{'='*80}")

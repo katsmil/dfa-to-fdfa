@@ -1,7 +1,7 @@
 import networkx as nx
 from collections import defaultdict
 from typing import List, Set, Dict
-from .analyze import CanonicalSubstructure
+from analyze import CanonicalSubstructure
 
 def create_subroutine_structure(G: nx.MultiDiGraph, sub: CanonicalSubstructure, sub_id: int):
     """

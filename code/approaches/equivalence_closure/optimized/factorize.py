@@ -1,7 +1,7 @@
 import networkx as nx 
 from typing import List, Set, Dict
 from collections import defaultdict
-from .analyze import CanonicalSubstructure
+from analyze import CanonicalSubstructure
 
 # --- HULPFUNCTIES --- 
 def _get_out_labels(G: nx.DiGraph, node: str) -> Dict[str, str]: 

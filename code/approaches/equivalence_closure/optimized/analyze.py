@@ -69,7 +69,7 @@ class SubstructureAnalyzer:
     4. Efficient frontier detection
     """
     
-    def __init__(self, G: nx.DiGraph, min_overlap: int = 1):
+    def __init__(self, G: nx.MultiDiGraph, min_overlap: int = 1):
         self.G = G
         self.min_overlap = min_overlap
         self.equivalence_closure = EquivalenceClosure(list(G.nodes()))

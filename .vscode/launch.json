@@ -1,54 +1,61 @@
 {
     "configurations": [
         {
-            "name": "EquivalenceClosure",
+            "name": "🔬 Equivalence Closure",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/EquivalenceClosure/main.py",
+            "program": "${workspaceFolder}/code/approaches/equivalence_closure/main.py",
             "console": "integratedTerminal",
             "args": [
                 "${input:inputFile}"
             ]
         },
         {
-            "name": "Benchmark",
+            "name": "🔬 Equivalence Closure (Optimized)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/code/approaches/equivalence_closure/optimized/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "${input:inputFile}"
+            ]
+        },
+        {
+            "name": "🔬 No Equivalence Closure - Exclusive (Optimized) [RECOMMENDED]",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/code/approaches/no_equivalence_closure/exclusive_frontiers/optimized/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "${input:inputFile}"
+            ]
+        },
+        {
+            "name": "🔬 No Equivalence Closure - Exclusive",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/code/approaches/no_equivalence_closure/exclusive_frontiers/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "${input:inputFile}"
+            ]
+        },
+        {
+            "name": "🔬 No Equivalence Closure - Hybrid Frontiers",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/code/approaches/no_equivalence_closure/hybrid_frontiers/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "${input:inputFile}"
+            ]
+        },
+        {
+            "name": "📊 Benchmark (beide varianten)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/code/benchmark/benchmark.py",
-            "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}"
-            ]
-        },
-        {
-            "name": "No EquivalenceClosure - hybrid frontiers",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/code/No_EquivalenceClosure/hybrid_frontiers/main.py",
-            "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}"
-            ]
-        },
-        {
-            "name": "No EquivalenceClosure - exclusive frontiers",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/code/No_EquivalenceClosure/exclusive_frontiers/main.py",
-            "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}"
-            ]
-        },
-        {
-            "name": "(Optimized) No EquivalenceClosure - exclusive frontiers",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/code/No_EquivalenceClosure/exclusive_frontiers/optimized/main.py",
-            "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}"
-            ]
+            "console": "integratedTerminal"
         }
     ],
     "inputs": [
