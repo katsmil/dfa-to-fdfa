@@ -1,0 +1,78 @@
+{
+  "NoEquivalenceClosure": [
+    {
+      "graph_name": "bigSmall",
+      "analysis_time": 0.0028028488159179688,
+      "factorization_time": 0.0007481575012207031,
+      "total_time": 0.0035657882690429688,
+      "structures_found": 5,
+      "nodes_before": 21,
+      "nodes_after": 15,
+      "compression_ratio": 0.7142857142857143,
+      "language_preserved": true,
+      "determinism_check": true
+    },
+    {
+      "graph_name": "differentEntries",
+      "analysis_time": 0.00030994415283203125,
+      "factorization_time": 0.000179290771484375,
+      "total_time": 0.0004992485046386719,
+      "structures_found": 4,
+      "nodes_before": 15,
+      "nodes_after": 14,
+      "compression_ratio": 0.9333333333333333,
+      "language_preserved": true,
+      "determinism_check": true
+    },
+    {
+      "graph_name": "fourComponents",
+      "analysis_time": 0.00022602081298828125,
+      "factorization_time": 0.0001590251922607422,
+      "total_time": 0.00039887428283691406,
+      "structures_found": 5,
+      "nodes_before": 16,
+      "nodes_after": 13,
+      "compression_ratio": 0.8125,
+      "language_preserved": true,
+      "determinism_check": true
+    }
+  ],
+  "EquivalenceClosure": [
+    {
+      "graph_name": "bigSmall",
+      "analysis_time": 0.002625703811645508,
+      "factorization_time": 0.0008692741394042969,
+      "total_time": 0.003511190414428711,
+      "structures_found": 2,
+      "nodes_before": 21,
+      "nodes_after": 18,
+      "compression_ratio": 0.8571428571428571,
+      "language_preserved": true,
+      "determinism_check": true
+    },
+    {
+      "graph_name": "differentEntries",
+      "analysis_time": 0.0001690387725830078,
+      "factorization_time": 0.00016498565673828125,
+      "total_time": 0.00034499168395996094,
+      "structures_found": 2,
+      "nodes_before": 15,
+      "nodes_after": 14,
+      "compression_ratio": 0.9333333333333333,
+      "language_preserved": true,
+      "determinism_check": true
+    },
+    {
+      "graph_name": "fourComponents",
+      "analysis_time": 0.0001499652862548828,
+      "factorization_time": 0.00016808509826660156,
+      "total_time": 0.00032901763916015625,
+      "structures_found": 1,
+      "nodes_before": 16,
+      "nodes_after": 13,
+      "compression_ratio": 0.8125,
+      "language_preserved": true,
+      "determinism_check": true
+    }
+  ]
+}

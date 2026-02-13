@@ -11,20 +11,20 @@
             ]
         },
         {
-            "name": "Main_2 - Recognize and Factorize Substructures",
+            "name": "Benchmark",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/main_new_2.py",
+            "program": "${workspaceFolder}/code/benchmark/benchmark.py",
             "console": "integratedTerminal",
             "args": [
                 "${input:inputFile}"
             ]
         },
         {
-            "name": "No EquivalenceClosure",
+            "name": "No EquivalenceClosure - hybrid frontiers",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/No_EquivalenceClosure/main.py",
+            "program": "${workspaceFolder}/code/No_EquivalenceClosure/hybrid_frontiers/main.py",
             "console": "integratedTerminal",
             "args": [
                 "${input:inputFile}"
@@ -41,101 +41,10 @@
             ]
         },
         {
-            "name": "Determine iso between regions found by dominator theory",
+            "name": "(Optimized) No EquivalenceClosure - exclusive frontiers",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/dominator_region_isomorphism.py",
-            "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}",
-                "${input:nodeName}"
-            ]
-        },
-        {
-            "name": "Dynamically determine startnode for dominator search algo",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/root_agnostic_dominator_region_isomorphism.py",
-            "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}"
-            ]
-        },
-        {
-            "name": "Calculate Dominator Regions by Virtual Node",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/dominator_virtual_node.py",
-            "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}"
-            ]
-        },
-        {
-            "name": "[NX IsIsomorphic]Dominator Regons by Virtual Node",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/code/isomorphism_detector.py",
-            "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}"
-            ]
-        },
-        {
-            "name": "Iso check with Natural Loops",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/code/natural_loop_isomorphism.py",
-            "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}"
-            ]
-        },
-        {
-            "name": "MINIMIZATION",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/code/minimization[PoC].py",
-            "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}"
-            ]
-        },
-        {
-            "name": "Bisimilar SCC",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/code/bisimilar/bisimilar_scc.py",
-            "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}"
-            ]
-        },
-        {
-            "name": "Bisimilar Signature",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/code/bisimilar/bisimilar_signature.py",
-            "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}"
-            ]
-        },
-        {
-            "name": "Bisimilar Sign + HK Optimalization",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/code/bisimilar/bisimilar_sign_HK_optimalization.py",
-            "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}"
-            ]
-        },
-        {
-            "name": "test",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/code/test.py",
+            "program": "${workspaceFolder}/code/No_EquivalenceClosure/exclusive_frontiers/optimized/main.py",
             "console": "integratedTerminal",
             "args": [
                 "${input:inputFile}"

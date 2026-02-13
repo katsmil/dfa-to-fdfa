@@ -253,8 +253,6 @@ def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[CanonicalSubstru
             effective_count=eff_count
         ))
     
-    # Sortering op basis van de nieuwe effective_count
-    #return sorted(results, key=lambda x: (x.overlap_size * x.effective_count), reverse=True)
     return sorted(results, 
               key=lambda x: (x.overlap_size * x.effective_count, x.overlap_size), 
               reverse=True)
