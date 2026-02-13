@@ -56,6 +56,13 @@
             "request": "launch",
             "program": "${workspaceFolder}/code/benchmark/benchmark.py",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "🧪 Language Preservation Tester",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/code/language_preservation/language_preservation.py",
+            "console": "integratedTerminal",
         }
     ],
     "inputs": [
