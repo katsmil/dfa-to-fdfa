@@ -20,7 +20,38 @@ class DFAExecutor:
     def __init__(self, G: nx.MultiDiGraph):
         self.G = G
         self.start_node = self._find_start_node()
+        # Volg epsilon-transities naar de echte start node
+        self.start_node = self._follow_epsilon_transitions(self.start_node)
         self.accepting_nodes = self._find_accepting_nodes()
+    
+    def _follow_epsilon_transitions(self, node: str) -> str:
+        """Volg epsilon-transities (transities zonder label) tot we een labeled node bereiken"""
+        visited = set()
+        current = node
+        
+        while current not in visited:
+            visited.add(current)
+            # Zoek transities zonder label (epsilon-transities)
+            epsilon_target = None
+            has_labeled = False
+            
+            for _, target, data in self.G.out_edges(current, data=True):
+                if 'label' not in data or data.get('label') is None:
+                    epsilon_target = target
+                else:
+                    has_labeled = True
+            
+            # Als deze node labeled edges heeft, dit is onze echte start
+            if has_labeled:
+                return current
+            
+            # Anders volgen we de epsilon-transitie
+            if epsilon_target and epsilon_target not in visited:
+                current = epsilon_target
+            else:
+                break
+        
+        return current
     
     def _find_start_node(self) -> str:
         """Vind de startnode (in-degree 0, of heeft 'start' attribuut)"""
@@ -82,17 +113,46 @@ class DFAExecutor:
             current = next_node
             trace.append(f"  '{symbol}' → {current}")
         
+        # Volg epsilon-transities naar accepting state
+        current = self._follow_epsilon_to_accepting(current)
+        
         # Check of we in accepting state zijn
         accepted = current in self.accepting_nodes
         trace.append(f"\nFinal: {current} ({'ACCEPT' if accepted else 'REJECT'})")
         
         return accepted, "\n".join(trace)
     
+    def _follow_epsilon_to_accepting(self, node: str) -> str:
+        """Volg epsilon-transities tot we een accepting node vinden (of geen epsilon meer)"""
+        visited = set()
+        current = node
+        
+        while current not in visited:
+            visited.add(current)
+            
+            if current in self.accepting_nodes:
+                return current
+            
+            # Zoek epsilon-transities
+            epsilon_target = None
+            for _, target, data in self.G.out_edges(current, data=True):
+                if 'label' not in data or data.get('label') is None:
+                    epsilon_target = target
+                    break
+            
+            if epsilon_target and epsilon_target not in visited:
+                current = epsilon_target
+            else:
+                break
+        
+        return current
+    
     def _take_transition(self, node: str, symbol: str) -> Optional[str]:
-        """Vind de target node voor een transitie met gegeven label"""
+        """Vind de target node voor een transitie met gegeven label, en volg epsilon-transities"""
         for _, target, data in self.G.out_edges(node, data=True):
             if data.get('label') == symbol:
-                return target
+                # Volg epsilon-transities van target totdat we een node met labeled outgoing vinden
+                return self._follow_epsilon_transitions(target)
         return None
     
     def _get_subroutine_entry(self, rc_node: str) -> Optional[str]:
