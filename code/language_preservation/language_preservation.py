@@ -3,7 +3,7 @@ LANGUAGE PRESERVATION TESTING
 ==============================
 
 Test of de gefactoriseerde automaat dezelfde taal accepteert als het origineel.
-Dit is essentieel voor je correctheidsbewijs en variant-onafhankelijk.
+Dit is essentieel voor correctheidsbewijs en variant-onafhankelijk.
 """
 
 import networkx as nx
@@ -271,8 +271,8 @@ class LanguagePreservationTester:
 # VOORBEELD GEBRUIK
 if __name__ == "__main__":
     # Laad beide versies
-    G_original = nx.nx_pydot.read_dot("input/joshua/bigSmall.dot")
-    G_factored = nx.nx_pydot.read_dot("output/bigSmall_factorized.dot")
+    G_original = nx.nx_pydot.read_dot("input/test_automata/deel_8.dot")
+    G_factored = nx.nx_pydot.read_dot("output/deel_8_factorized.dot")
     
     # Test equivalentie
     tester = LanguagePreservationTester(G_original, G_factored)

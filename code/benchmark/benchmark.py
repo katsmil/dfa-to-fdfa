@@ -57,6 +57,18 @@ def load_variant_module(variant: str, module_name: str, analyze_module=None):
     
     return module
 
+def count_real_nodes(G: nx.MultiDiGraph) -> int:
+    """Tel aantal nodes, exclusief dummy start nodes (__start_*)."""
+    return sum(1 for node in G.nodes() if not str(node).startswith('__start_'))
+
+def count_real_edges(G: nx.MultiDiGraph) -> int:
+    """Tel aantal edges, exclusief edges van/naar dummy start nodes."""
+    count = 0
+    for u, v, key, data in G.edges(data=True, keys=True):
+        if not str(u).startswith('__start_') and not str(v).startswith('__start_'):
+            count += 1
+    return count
+
 @dataclass
 class BenchmarkResult:
     """Metrics die voor beide varianten gemeten worden"""
@@ -100,9 +112,9 @@ class BenchmarkSuite:
         
         start_total = time.time()
         
-        # PRE-METRICS
-        nodes_before = graph.number_of_nodes()
-        edges_before = graph.number_of_edges()
+        # PRE-METRICS (exclusief dummy nodes)
+        nodes_before = count_real_nodes(graph)
+        edges_before = count_real_edges(graph)
         
         # ANALYSIS PHASE
         start_analysis = time.time()
@@ -129,9 +141,9 @@ class BenchmarkSuite:
         
         total_time = time.time() - start_total
         
-        # POST-METRICS
-        nodes_after = factored_graph.number_of_nodes()
-        edges_after = factored_graph.number_of_edges()
+        # POST-METRICS (exclusief dummy nodes)
+        nodes_after = count_real_nodes(factored_graph)
+        edges_after = count_real_edges(factored_graph)
         
         # KWALITEITSMETRICS
         if structures:
@@ -141,7 +153,7 @@ class BenchmarkSuite:
         else:
             largest = 0
             avg_size = 0
-            effective_sum = 0
+            # effective_sum = 0
         
         # CORRECTHEIDSCHECK (zie functie hieronder)
         language_ok = self.verify_language_preservation(graph, factored_graph)
@@ -157,7 +169,7 @@ class BenchmarkSuite:
             nodes_after=nodes_after,
             edges_before=edges_before,
             edges_after=edges_after,
-            compression_ratio=nodes_after / nodes_before if nodes_before > 0 else 1.0,
+            compression_ratio=1.0 - (nodes_after / nodes_before) if nodes_before > 0 else 0.0,
             largest_structure_size=largest,
             avg_structure_size=avg_size,
             # effective_count_sum=effective_sum,
