@@ -63,6 +63,11 @@
             "request": "launch",
             "program": "${workspaceFolder}/code/language_preservation/language_preservation.py",
             "console": "integratedTerminal",
+            "args": [
+                "${input:lp_orig}",
+                "${input:lp_fact}",
+                "${input:lp_string}"
+            ]
         }
     ],
     "inputs": [
@@ -77,6 +82,24 @@
             "type": "promptString",
             "description": "Node name (bijv. P1)",
             "default": "P1"
+        },
+        {
+            "id": "lp_orig",
+            "type": "promptString",
+            "description": "Original DOT file (bijv. input/joshua/differentEntries.dot)",
+            "default": "input/joshua/differentEntries.dot"
+        },
+        {
+            "id": "lp_fact",
+            "type": "promptString",
+            "description": "Factored DOT file (bijv. output/differentEntries_factorized.dot)",
+            "default": "output/differentEntries_factorized.dot"
+        },
+        {
+            "id": "lp_string",
+            "type": "promptString",
+            "description": "Input string (bijv. axxa or 'a x x a' for spaced tokens)",
+            "default": "axxa"
         }
     ]
 }

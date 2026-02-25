@@ -18,7 +18,7 @@ class DFAExecutor:
     """
     
     def __init__(self, G: nx.MultiDiGraph):
-        self.G = G
+        self.G = self._normalize_labels(G)
         self.start_node = self._find_start_node()
         # Volg epsilon-transities naar de echte start node
         self.start_node = self._follow_epsilon_transitions(self.start_node)
@@ -64,11 +64,17 @@ class DFAExecutor:
         return list(self.G.nodes())[0]
     
     def _find_accepting_nodes(self) -> Set[str]:
-        """Vind accepting states (doublecircle shape)"""
-        return {
-            node for node in self.G.nodes()
-            if self.G.nodes[node].get('shape') == 'doublecircle'
-        }
+        """Vind accepting states (doublecircle shape of peripheries=2)"""
+        accepting = set()
+        for node in self.G.nodes():
+            nd = self.G.nodes[node]
+            # Check for doublecircle shape
+            if nd.get('shape') == 'doublecircle':
+                accepting.add(node)
+            # Also check for peripheries=2 (used in factored graphs)
+            elif nd.get('peripheries') == 2 or nd.get('peripheries') == '2':
+                accepting.add(node)
+        return accepting
     
     def execute(self, input_string: List[str]) -> Tuple[bool, str]:
         """
@@ -117,7 +123,15 @@ class DFAExecutor:
         current = self._follow_epsilon_to_accepting(current)
         
         # Check of we in accepting state zijn
-        accepted = current in self.accepting_nodes
+        # If the accepting node belongs to a subroutine, it should not count
+        # as accepting for the whole automaton — subroutine accepting states
+        # are frontiers that only allow returning to the caller.
+        accepted = False
+        if current in self.accepting_nodes:
+            nd = self.G.nodes.get(current, {})
+            cluster = nd.get('cluster')
+            if not (isinstance(cluster, str) and 'subroutine' in cluster):
+                accepted = True
         trace.append(f"\nFinal: {current} ({'ACCEPT' if accepted else 'REJECT'})")
         
         return accepted, "\n".join(trace)
@@ -160,21 +174,75 @@ class DFAExecutor:
         Vind de entry node van de subroutine die bij deze RC hoort.
         In de gefactoriseerde graaf zijn dit de nodes met cluster attribuut.
         """
-        # Zoek naar nodes in dezelfde cluster
-        for node in self.G.nodes():
-            node_data = self.G.nodes[node]
-            if 'cluster' in node_data and 'subroutine' in node_data['cluster']:
-                # Dit is waarschijnlijk de entry (vaak index 0)
-                if node.endswith('_0'):
+        # Probeer eerst de clusternaam uit het RC label te halen (bijv. 'subroutine_1')
+        node_data = self.G.nodes.get(rc_node, {})
+        label = node_data.get('label', '')
+        cluster_name = None
+        if isinstance(label, str) and 'subroutine' in label:
+            # zoek naar woord 'subroutine_<id>' in label
+            parts = label.replace('\n', ' ').split()
+            for p in parts:
+                if p.startswith('subroutine'):
+                    cluster_name = p
+                    break
+
+        # Als we een clusternaam hebben, zoek naar node met precies die cluster
+        if cluster_name:
+            for node in self.G.nodes():
+                nd = self.G.nodes[node]
+                if nd.get('cluster') == cluster_name and str(node).endswith('_0'):
                     return node
+
+        # Fallback: zoek naar nodes die een cluster attribuut bevatten met 'subroutine'
+        for node in self.G.nodes():
+            nd = self.G.nodes[node]
+            cluster = nd.get('cluster')
+            if isinstance(cluster, str) and 'subroutine' in cluster and str(node).endswith('_0'):
+                return node
+
         return None
     
     def _is_frontier(self, node: str) -> bool:
         """Check of een node een frontier is (accepting + heeft externe exits)"""
         if node not in self.accepting_nodes:
             return False
-        # In de gefactoriseerde graaf zijn frontiers accepting nodes in subroutines
-        return 'SUB_' in node
+
+        # Controleer of deze node behoort tot een subroutine via node attribuut
+        nd = self.G.nodes.get(node, {})
+        cluster = nd.get('cluster')
+        if isinstance(cluster, str) and 'subroutine' in cluster:
+            return True
+
+        # Fallback: sommige nodes gebruiken naamconventie 'SUB_<...>'
+        if 'SUB_' in str(node):
+            return True
+
+        return False
+
+    def _normalize_labels(self, G: nx.MultiDiGraph) -> nx.MultiDiGraph:
+        """
+        Clean up edge labels: remove extra quotes and normalize whitespace.
+        This handles cases where labels are stored as '"a"' instead of 'a'.
+        """
+        import copy
+        G_norm = copy.deepcopy(G)
+        
+        for u, v, key, data in G_norm.edges(keys=True, data=True):
+            if 'label' in data:
+                label = data['label']
+                # Convert to string if not already
+                if not isinstance(label, str):
+                    label = str(label)
+                # Remove surrounding quotes if they exist
+                if len(label) >= 2 and ((label[0] == '"' and label[-1] == '"') or 
+                                        (label[0] == "'" and label[-1] == "'")):
+                    label = label[1:-1]
+                # Strip whitespace
+                label = label.strip()
+                # Update the edge label
+                G_norm[u][v][key]['label'] = label
+        
+        return G_norm
 
 
 class LanguagePreservationTester:
@@ -268,13 +336,88 @@ class LanguagePreservationTester:
         return "\n".join(report)
 
 
+def verify_language_preservation(G_original: nx.MultiDiGraph, G_factored: nx.MultiDiGraph,
+                                 num_tests: int = 200, max_length: int = 20,
+                                 verbose: bool = False) -> Tuple[bool, List[str]]:
+    """
+    Convenience wrapper to run randomized language-preservation tests from other modules.
+
+    Returns (all_match, mismatches)
+    """
+    tester = LanguagePreservationTester(G_original, G_factored)
+
+    # If there is no alphabet (no labeled edges) we still want to compare
+    # acceptance for the empty string; in that case build a single empty test.
+    if not tester.alphabet:
+        test_strings = [[]]
+    else:
+        test_strings = tester.generate_random_strings(count=num_tests, max_length=max_length)
+
+    all_match, mismatches = tester.test_equivalence(test_strings, verbose=verbose)
+    return all_match, mismatches
+
+
+def compare_graphs_on_string(G_original: nx.MultiDiGraph, G_factored: nx.MultiDiGraph,
+                             input_string, verbose: bool = True) -> dict:
+    """
+    Compare two graphs on a single input string.
+
+    Args:
+        G_original: original DFA as a NetworkX MultiDiGraph
+        G_factored: factored DFA as a NetworkX MultiDiGraph
+        input_string: either a string like 'axxa' or a list of symbols ['a','x','x','a']
+        verbose: when True print traces and results
+
+    Returns a dict with acceptance booleans and traces for both graphs.
+    """
+    # Normalize input_string to list of symbols
+    if isinstance(input_string, str):
+        symbols = list(input_string)
+    else:
+        symbols = list(input_string)
+
+    exec_orig = DFAExecutor(G_original)
+    exec_fact = DFAExecutor(G_factored)
+
+    acc_orig, trace_orig = exec_orig.execute(symbols)
+    acc_fact, trace_fact = exec_fact.execute(symbols)
+
+    result = {
+        'string': ''.join(symbols),
+        'accepted_original': acc_orig,
+        'accepted_factored': acc_fact,
+        'trace_original': trace_orig,
+        'trace_factored': trace_fact
+    }
+
+    if verbose:
+        print(f"String: {result['string']}")
+        print(f"Original: {'ACCEPT' if acc_orig else 'REJECT'}")
+        print(result['trace_original'])
+        print('\nFactored: ' + ('ACCEPT' if acc_fact else 'REJECT'))
+        print(result['trace_factored'])
+
+    return result
+
+
 # VOORBEELD GEBRUIK
 if __name__ == "__main__":
-    # Laad beide versies
-    G_original = nx.nx_pydot.read_dot("input/test_automata/deel_8.dot")
-    G_factored = nx.nx_pydot.read_dot("output/deel_8_factorized.dot")
-    
-    # Test equivalentie
-    tester = LanguagePreservationTester(G_original, G_factored)
-    report = tester.run_comprehensive_test(num_tests=1000)
-    print(report)
+    import sys
+
+    # CLI: python language_preservation.py <orig.dot> <factored.dot> <string>
+    if len(sys.argv) >= 4:
+        orig_path = sys.argv[1]
+        fact_path = sys.argv[2]
+        input_str = sys.argv[3]
+
+        G_original = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(orig_path))
+        G_factored = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(fact_path))
+
+        compare_graphs_on_string(G_original, G_factored, input_str, verbose=True)
+    else:
+        # fallback example
+        G_original = nx.nx_pydot.read_dot("input/test_automata/deel_8.dot")
+        G_factored = nx.nx_pydot.read_dot("output/deel_8_factorized.dot")
+        tester = LanguagePreservationTester(G_original, G_factored)
+        report = tester.run_comprehensive_test(num_tests=1000)
+        print(report)
