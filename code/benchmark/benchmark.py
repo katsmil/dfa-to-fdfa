@@ -19,6 +19,9 @@ import importlib.util
 # This must happen BEFORE any custom imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)  # Should be .../code/
+# Ensure project root is importable so we can `import language_preservation...`
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 # Setup variant module loaders
 def load_variant_module(variant: str, module_name: str, analyze_module=None):
@@ -94,6 +97,8 @@ class BenchmarkResult:
     # Correctheid
     language_preserved: bool  # Via random walk testing
     determinism_check: bool   # Geen duplicate labels op RC nodes
+    # Details from language preservation testing
+    language_mismatches: List[str]
 
 class BenchmarkSuite:
     """
@@ -156,7 +161,7 @@ class BenchmarkSuite:
             # effective_sum = 0
         
         # CORRECTHEIDSCHECK (zie functie hieronder)
-        language_ok = self.verify_language_preservation(graph, factored_graph)
+        language_ok, mismatches = self.verify_language_preservation(graph, factored_graph)
         determinism_ok = self.verify_determinism(factored_graph)
         
         result = BenchmarkResult(
@@ -174,6 +179,7 @@ class BenchmarkSuite:
             avg_structure_size=avg_size,
             # effective_count_sum=effective_sum,
             language_preserved=language_ok,
+            language_mismatches=mismatches,
             determinism_check=determinism_ok
         )
         
@@ -190,8 +196,20 @@ class BenchmarkSuite:
         Test of beide automaten dezelfde strings accepteren.
         Gebruik random walk testing (zie implementatie hieronder).
         """
-        # TODO: Implementeer random walk generator + acceptance check
-        return True  # Placeholder
+        try:
+            from language_preservation.language_preservation import verify_language_preservation as lp_verify
+        except Exception as e:
+            print(f"⚠️  Warning: could not import language_preservation helper: {e}")
+            return True, []
+
+        try:
+            ok, mismatches = lp_verify(G_orig, G_fact, num_tests=200)
+            if not ok:
+                print(f"⚠️  Language preservation test found {len(mismatches)} mismatches (see details).")
+            return ok, mismatches
+        except Exception as e:
+            print(f"⚠️  Error while running language preservation tests: {e}")
+            return False, [f"Error running tests: {e}"]
     
     def verify_determinism(self, G: nx.MultiDiGraph) -> bool:
         """
@@ -243,7 +261,16 @@ class BenchmarkSuite:
             # CORRECTHEID
             report.append(f"\n✅ CORRECTNESS:")
             report.append(f"  NoEquiv:  Language OK: {no_eq.language_preserved}, Determinism: {no_eq.determinism_check}")
+            if not no_eq.language_preserved and no_eq.language_mismatches:
+                report.append(f"    → Mismatches (sample up to 2):")
+                for m in no_eq.language_mismatches[:2]:
+                    report.append(f"      - {m.splitlines()[3] if '\n' in m else m}")
+
             report.append(f"  Equiv:    Language OK: {eq.language_preserved}, Determinism: {eq.determinism_check}")
+            if not eq.language_preserved and eq.language_mismatches:
+                report.append(f"    → Mismatches (sample up to 2):")
+                for m in eq.language_mismatches[:2]:
+                    report.append(f"      - {m.splitlines()[3] if '\n' in m else m}")
         
         return "\n".join(report)
     
@@ -264,6 +291,8 @@ class BenchmarkSuite:
                     'nodes_after': r['result'].nodes_after,
                     'compression_ratio': r['result'].compression_ratio,
                     'language_preserved': r['result'].language_preserved,
+                    'language_mismatch_count': len(r['result'].language_mismatches) if r['result'].language_mismatches else 0,
+                    'language_mismatch_sample': r['result'].language_mismatches[:3] if r['result'].language_mismatches else [],
                     'determinism_check': r['result'].determinism_check
                 }
                 json_data[variant].append(result_dict)
