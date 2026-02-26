@@ -211,16 +211,29 @@ class BenchmarkSuite:
             print(f"⚠️  Error while running language preservation tests: {e}")
             return False, [f"Error running tests: {e}"]
     
+    # def verify_determinism(self, G: nx.MultiDiGraph) -> bool:
+    #     """
+    #     Check dat er geen duplicate labels op RC nodes zijn.
+    #     Dit moet voor beide varianten gelden!
+    #     """
+    #     for node in G.nodes():
+    #         if 'RC' in str(node):  # Convert to string to handle different node types
+    #             labels = [d.get('label') for _, _, d in G.out_edges(node, data=True)]
+    #             if len(labels) != len(set(labels)):
+    #                 return False  # Duplicate gevonden!
+    #     return True
+    
     def verify_determinism(self, G: nx.MultiDiGraph) -> bool:
         """
-        Check dat er geen duplicate labels op RC nodes zijn.
-        Dit moet voor beide varianten gelden!
+        Check dat er geen duplicate labels op non-RC nodes zijn.
+        RC nodes mogen visueel nondeterministisch lijken (dat is normaal in een gefactorde DFA).
+        Alle andere nodes mogen geen duplicate outgoing labels hebben.
         """
         for node in G.nodes():
-            if 'RC' in str(node):  # Convert to string to handle different node types
+            if not 'RC' in str(node):  # Sla RC nodes over
                 labels = [d.get('label') for _, _, d in G.out_edges(node, data=True)]
                 if len(labels) != len(set(labels)):
-                    return False  # Duplicate gevonden!
+                    return False  # Duplicate gevonden op niet-RC node!
         return True
     
     def generate_comparison_report(self) -> str:
@@ -349,7 +362,7 @@ if __name__ == "__main__":
     # - 'large'           : Grotere real-world voorbeelden (url_parser, etc.)
     # - 'test_automata'   : Alle deel_*.dot files uit input/test_automata/
     # - 'custom'          : Aangepaste list - voeg je eigen testen toe
-    TEST_MODE = 'large'  # ← WIJZIG DEZE LIJN
+    TEST_MODE = 'test_automata'  # ← WIJZIG DEZE LIJN
     
     if TEST_MODE == 'joshua':
         # Kleine testcases voor snelle feedback
