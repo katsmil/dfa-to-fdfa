@@ -50,16 +50,12 @@ class SubstructureAnalyzer:
         if start_a == start_b:
             return None
 
-        # FASE 1+2 GEFUSEERD: BFS met inline validatie (inkomend + uitgaand)
+        # FASE 1: BFS Discovery
         queue = deque([(start_a, start_b)])
         visited_pairs = [] 
         pair_set = set()
-        pair_mapping = {}  # a -> b
-        reverse_mapping = {} # b -> a (NIEUW: nodig voor de n2 check)
         nodes_in_a = set()
         nodes_in_b = set()
-        node_to_idx = {}  # a -> index
-        blueprint_edges = []
 
         while queue:
             pair = queue.popleft()
@@ -67,80 +63,27 @@ class SubstructureAnalyzer:
             
             n1, n2 = pair
 
-            # 1. IDENTITEITS CHECK
+            # 1. IDENTITEITS CHECK: Als de BFS bij dezelfde node uitkomt, 
+    #       # stopt de bisimilaire overlap hier.
             if n1 == n2: 
                 continue
 
-            # 2. INTERNE OVERLAP CHECK
+            # 2. INTERNE OVERLAP CHECK: 
+    #       # Voorkom dat kant A van de match nodes van kant B gaat bevatten en vice versa.
+    #       # Dit voorkomt dat een pad dat in zichzelf draait als "herhaling" wordt gezien.
             if n1 in nodes_in_b or n2 in nodes_in_a: 
                 return None
 
             if self.get_node_signature(n1) == self.get_node_signature(n2):
+                visited_pairs.append(pair)
+                pair_set.add(pair)
+                nodes_in_a.add(n1)
+                nodes_in_b.add(n2)
+                
                 e1 = self._get_edges_cached(n1)
                 e2 = self._get_edges_cached(n2)
                 
-                # ===== VALIDATIE VOORDAT WE ACCEPTEREN =====
-                
-                # CHECK INKOMEND n1: Predecessors die al in overlap zitten
-                for pred_a in self.G.predecessors(n1):
-                    if pred_a in pair_mapping:
-                        pred_b = pair_mapping[pred_a]
-                        pred_edges_a = self._get_edges_cached(pred_a)
-                        pred_edges_b = self._get_edges_cached(pred_b)
-                        
-                        for label, target_a in pred_edges_a.items():
-                            if target_a == n1:
-                                target_b = pred_edges_b.get(label)
-                                if target_b != n2:
-                                    return None  # Inkomend n1 niet consistent
-                
-                # CHECK INKOMEND n2: Predecessors die al in overlap zitten
-                for pred_b in self.G.predecessors(n2):
-                    if pred_b in reverse_mapping:
-                        pred_a = reverse_mapping[pred_b]
-                        pred_edges_a = self._get_edges_cached(pred_a)
-                        pred_edges_b = self._get_edges_cached(pred_b)
-                        
-                        for label, target_b in pred_edges_b.items():
-                            if target_b == n2:
-                                target_a = pred_edges_a.get(label)
-                                if target_a != n1:
-                                    return None  # Inkomend n2 niet consistent
-                
-                # CHECK UITGAAND: Uniformiteit + Targets
-                all_labels = set(e1.keys()) | set(e2.keys())
-
-                for label in all_labels:
-                    t_a = e1.get(label)
-                    t_b = e2.get(label)
-
-                    is_internal_a = t_a is not None and t_a in nodes_in_a
-                    is_internal_b = t_b is not None and t_b in nodes_in_b
-
-                    # Uniformiteit: beide intern of beide extern
-                    if (is_internal_a and not is_internal_b) or (not is_internal_a and is_internal_b):
-                        return None
-
-                    # Targets: interne edges naar gemapte partners (controle op bestaande mapping)
-                    if is_internal_a:
-                        expected_t_b = pair_mapping.get(t_a)
-                        if t_b != expected_t_b:
-                            return None
-                    else:
-                        if t_a is not None and t_b is not None and t_b in nodes_in_b:
-                            return None
-
-                # ===== ALLES OK - ACCEPTEER PAAR =====
-                idx = len(visited_pairs)
-                visited_pairs.append(pair)
-                pair_set.add(pair)
-                pair_mapping[n1] = n2
-                reverse_mapping[n2] = n1  # Registreer de b -> a mapping
-                nodes_in_a.add(n1)
-                nodes_in_b.add(n2)
-                node_to_idx[n1] = idx
-                
-                # Queue volgende
+                # Alleen verder zoeken op gemeenschappelijke labels
                 for label in e1:
                     if label in e2:
                         queue.append((e1[label], e2[label]))
@@ -148,18 +91,38 @@ class SubstructureAnalyzer:
         if len(visited_pairs) < self.min_overlap:
             return None
 
-        # BOUW NU DE BLUEPRINT EDGES OP BASIS VAN DE VOLLEDIGE MATCHSET
-        pair_mapping = dict(visited_pairs)  # a -> b
+        # FASE 2: Validatie van Structuur & Non-determinisme
+        pair_mapping = dict(visited_pairs) # a -> b
         nodes_a = [p[0] for p in visited_pairs]
         node_to_idx = {node: i for i, node in enumerate(nodes_a)}
         blueprint_edges = []
-
+        
         for i, (u_a, u_b) in enumerate(visited_pairs):
             out_a = self._get_edges_cached(u_a)
-
-            for label, t_a in out_a.items():
-                if t_a in node_to_idx:
+            out_b = self._get_edges_cached(u_b)
+            
+            # Controleer alle labels van beide kanten
+            all_labels = set(out_a.keys()) | set(out_b.keys())
+            
+            for label in all_labels:
+                t_a = out_a.get(label)
+                t_b = out_b.get(label)
+                
+                # Is de transitie aan de A-kant intern aan de gevonden match?
+                is_internal_a = t_a in node_to_idx
+                
+                if is_internal_a:
+                    # B MOET naar de partner van t_a gaan
+                    expected_t_b = pair_mapping.get(t_a)
+                    if t_b != expected_t_b:
+                        return None # non-determinisme gedetecteerd
+                    
+                    # Voeg toe aan blueprint (we gebruiken set later voor deduplicatie)
                     blueprint_edges.append(BlueprintEdge(i, node_to_idx[t_a], label))
+                else:
+                    # Als A extern gaat, mag B NOOIT naar een interne node gaan met dit label
+                    if t_b in nodes_in_b:
+                        return None # Grens-discrepantie
 
         return {
             'nodes_a': tuple(nodes_a),

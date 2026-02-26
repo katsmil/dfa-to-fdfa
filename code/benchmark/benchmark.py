@@ -349,7 +349,7 @@ if __name__ == "__main__":
     # - 'large'           : Grotere real-world voorbeelden (url_parser, etc.)
     # - 'test_automata'   : Alle deel_*.dot files uit input/test_automata/
     # - 'custom'          : Aangepaste list - voeg je eigen testen toe
-    TEST_MODE = 'joshua'  # ← WIJZIG DEZE LIJN
+    TEST_MODE = 'large'  # ← WIJZIG DEZE LIJN
     
     if TEST_MODE == 'joshua':
         # Kleine testcases voor snelle feedback
