@@ -78,7 +78,7 @@ class SubstructureAnalyzer:
         self.min_overlap = min_overlap
         self.equivalence_closure = EquivalenceClosure(list(G.nodes()))
         
-        # OPTIMALISATIE: Lazy caching - alleen berekenen wat nodig is
+        # OPTIMALISATIE: Lazy caching
         self._signature_cache: Dict[str, Tuple] = {}
         self._edge_cache: Dict[str, Dict[str, str]] = {}
         self._accepting_cache: Dict[str, bool] = {}
@@ -292,7 +292,6 @@ def aggregate_canonical_results(matches: List[SubstructureMatch]) -> List[Canoni
 def calculate_savings(sub: CanonicalSubstructure) -> int:
     """
     Berekent de 'winst' in termen van nodes.
-    Formule: (Oud aantal nodes) - (Nieuw aantal nodes)
     """
     n = sub.overlap_size
     k = len(sub.locations)

@@ -1,10 +1,10 @@
 {
     "configurations": [
         {
-            "name": "🔬 Equivalence Closure",
+            "name": "🔬 Equivalence Closure (Not Optimized)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/approaches/equivalence_closure/main.py",
+            "program": "${workspaceFolder}/code/approaches/equivalence_closure/not_optimized/main.py",
             "console": "integratedTerminal",
             "args": [
                 "${input:inputFile}"
@@ -31,20 +31,30 @@
             ]
         },
         {
-            "name": "🔬 No Equivalence Closure - Exclusive (Optimized) [RECOMMENDED]",
+            "name": "🔬 No Equivalence Closure - Exclusive (Optimized + Fases Combined)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/approaches/no_equivalence_closure/exclusive_frontiers/optimized/main.py",
+            "program": "${workspaceFolder}/code/approaches/no_equivalence_closure/exclusive_frontiers/optimized_fases_combined/main.py",
             "console": "integratedTerminal",
             "args": [
                 "${input:inputFile}"
             ]
         },
         {
-            "name": "🔬 No Equivalence Closure - Exclusive",
+            "name": "🔬 No Equivalence Closure - Exclusive (Optimized + Fases Separated)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/approaches/no_equivalence_closure/exclusive_frontiers/main.py",
+            "program": "${workspaceFolder}/code/approaches/no_equivalence_closure/exclusive_frontiers/optimized_fases_separated/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "${input:inputFile}"
+            ]
+        },
+        {
+            "name": "🔬 No Equivalence Closure - Exclusive (Not Optimized)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/code/approaches/no_equivalence_closure/exclusive_frontiers/not_optimized/main.py",
             "console": "integratedTerminal",
             "args": [
                 "${input:inputFile}"
