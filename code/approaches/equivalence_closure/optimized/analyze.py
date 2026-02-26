@@ -267,9 +267,11 @@ def calculate_savings(sub: CanonicalSubstructure) -> int:
     """
     n = sub.overlap_size
     k = len(sub.locations)
+
     if k < 2: 
-        return -9999
-    return (n * k) - (n + k)
+        return 0
+    
+    return n * (k - 1)
 
 def prioritize_candidates(candidates: List[CanonicalSubstructure]) -> List[CanonicalSubstructure]:
     """

@@ -21,6 +21,16 @@
             ]
         },
         {
+            "name": "🔬 Equivalence Closure (exclusive frontiers)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/code/approaches/equivalence_closure/exclusive_frontiers/main.py",
+            "console": "integratedTerminal",
+            "args": [
+                "${input:inputFile}"
+            ]
+        },
+        {
             "name": "🔬 No Equivalence Closure - Exclusive (Optimized) [RECOMMENDED]",
             "type": "debugpy",
             "request": "launch",

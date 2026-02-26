@@ -40,7 +40,7 @@ def main():
         output_folder = Path("output")
         output_folder.mkdir(parents=True, exist_ok=True)
         input_path = Path(input_file)
-        output_dot = output_folder / (input_path.stem + "_factorized.dot")
+        output_dot = output_folder / (input_path.stem + "_EqClosure_ExclFront_factorized.dot")
 
         save_dot(G_factorized, str(output_dot))
 

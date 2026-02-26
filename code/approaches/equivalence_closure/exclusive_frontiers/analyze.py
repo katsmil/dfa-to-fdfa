@@ -82,6 +82,7 @@ class SubstructureAnalyzer:
         self._signature_cache: Dict[str, Tuple] = {}
         self._edge_cache: Dict[str, Dict[str, str]] = {}
         self._accepting_cache: Dict[str, bool] = {}
+        
 
     def _get_edges_cached(self, node: str) -> Dict[str, str]:
         """OPTIMALISATIE: Lazy edge caching"""
@@ -112,132 +113,133 @@ class SubstructureAnalyzer:
         return sig
 
     def _check_strict_match(self, n1: str, n2: str) -> bool:
-        """OPTIMALISATIE: Gebruik cached data voor match checking"""
-        if self._is_accepting_cached(n1) != self._is_accepting_cached(n2):
-            return False
-        
-        e1 = self._get_edges_cached(n1)
-        e2 = self._get_edges_cached(n2)
-        
-        # Set comparison is sneller dan key-by-key
-        if set(e1.keys()) != set(e2.keys()):
-            return False
-        
-        return True
+        return self.get_node_signature(n1) == self.get_node_signature(n2)
 
     def find_maximal_overlap(self, start_a: str, start_b: str) -> Optional[SubstructureMatch]:
-        """
-        TWEE-FASEN AANPAK met EXCLUSIVE FRONTIERS:
-        
-        FASE 1: BFS Discovery
-        - Vind alle bisimilaire node-paren
-        - Early exits bij identiteit en interne overlap
-        
-        FASE 2: Validatie (NIEUWE FIX!)
-        - Check non-determinisme: twee nodes mogen niet naar dezelfde externe node wijzen
-        - Check grens-consistentie: beide kanten moeten symmetrisch zijn
-        
-        Dit voorkomt hybrid/overlapping frontiers en garandeert dat de match
-        deterministisch substitueerbaar is.
-        """
-        # OPTIMALISATIE: Early exit voor triviale cases
         if start_a == start_b:
             return None
-        
-        if not self._check_strict_match(start_a, start_b):
-            return None
 
-        # FASE 1: BFS DISCOVERY
         queue = deque([(start_a, start_b)])
         visited_pairs = []
-        pair_set: Set[Tuple[str, str]] = set()
-        nodes_in_a: Set[str] = set()
-        nodes_in_b: Set[str] = set()
+        pair_set = set()
+        pair_mapping = {}       # a -> b
+        reverse_mapping = {}    # b -> a
+        nodes_in_a = set()
+        nodes_in_b = set()
 
         while queue:
-            pair = queue.popleft()
-            if pair in pair_set:
+            n1, n2 = queue.popleft()
+            if (n1, n2) in pair_set:
                 continue
 
-            n1, n2 = pair
-            
-            # OPTIMALISATIE: Early exit check
+            # 1. Identiteit
             if n1 == n2:
                 continue
 
-            # OPTIMALISATIE: Early exit bij interne overlap
+            # 2. Interne overlap
             if n1 in nodes_in_b or n2 in nodes_in_a:
                 return None
 
-            if self._check_strict_match(n1, n2):
-                visited_pairs.append(pair)
-                pair_set.add(pair)
-                nodes_in_a.add(n1)
-                nodes_in_b.add(n2)
-                self.equivalence_closure.add_equivalence(n1, n2)
-                
-                # OPTIMALISATIE: Gebruik cached edges
-                e1 = self._get_edges_cached(n1)
-                e2 = self._get_edges_cached(n2)
-                
-                # Voeg alleen gemeenschappelijke labels toe aan queue
-                for label in e1:
-                    if label in e2:
-                        queue.append((e1[label], e2[label]))
+            # 3. Signature check (cached)
+            if not self._check_strict_match(n1, n2):
+                continue
 
-        # OPTIMALISATIE: Early exit voor te kleine matches
+            e1 = self._get_edges_cached(n1)
+            e2 = self._get_edges_cached(n2)
+
+            # ===== INKOMENDE VALIDATIE =====
+
+            # Incoming n1
+            for pred_a in self.G.predecessors(n1):
+                if pred_a in pair_mapping:
+                    pred_b = pair_mapping[pred_a]
+                    pred_edges_a = self._get_edges_cached(pred_a)
+                    pred_edges_b = self._get_edges_cached(pred_b)
+
+                    for label, target_a in pred_edges_a.items():
+                        if target_a == n1:
+                            target_b = pred_edges_b.get(label)
+                            if target_b != n2:
+                                return None
+
+            # Incoming n2
+            for pred_b in self.G.predecessors(n2):
+                if pred_b in reverse_mapping:
+                    pred_a = reverse_mapping[pred_b]
+                    pred_edges_a = self._get_edges_cached(pred_a)
+                    pred_edges_b = self._get_edges_cached(pred_b)
+
+                    for label, target_b in pred_edges_b.items():
+                        if target_b == n2:
+                            target_a = pred_edges_a.get(label)
+                            if target_a != n1:
+                                return None
+
+            # ===== UITGAANDE VALIDATIE =====
+
+            all_labels = set(e1.keys()) | set(e2.keys())
+
+            for label in all_labels:
+                t_a = e1.get(label)
+                t_b = e2.get(label)
+
+                is_internal_a = t_a is not None and t_a in nodes_in_a
+                is_internal_b = t_b is not None and t_b in nodes_in_b
+
+                # Uniformiteit
+                if (is_internal_a and not is_internal_b) or (not is_internal_a and is_internal_b):
+                    return None
+
+                # Interne targets moeten gemapt zijn
+                if is_internal_a:
+                    expected = pair_mapping.get(t_a)
+                    if t_b != expected:
+                        return None
+                else:
+                    # externe targets mogen niet stiekem intern zijn
+                    if t_a is not None and t_b is not None and t_b in nodes_in_b:
+                        return None
+
+            # ===== ACCEPTEER PAAR =====
+
+            visited_pairs.append((n1, n2))
+            pair_set.add((n1, n2))
+            pair_mapping[n1] = n2
+            reverse_mapping[n2] = n1
+            nodes_in_a.add(n1)
+            nodes_in_b.add(n2)
+
+            # # ⬇️ BELANGRIJK: EquivalenceClosure update
+            # self.equivalence_closure.add_equivalence(n1, n2)
+
+            # Queue children
+            for label in e1:
+                if label in e2:
+                    queue.append((e1[label], e2[label]))
+
         if len(visited_pairs) < self.min_overlap:
             return None
 
-        # FASE 2: VALIDATIE - EXCLUSIVE FRONTIERS CHECK (NIEUWE FIX!)
-        pair_mapping = dict(visited_pairs)  # a -> b mapping
-        node_to_idx = {node: i for i, (node, _) in enumerate(visited_pairs)}
-        
-        for u_a, u_b in visited_pairs:
-            out_a = self._get_edges_cached(u_a)
-            out_b = self._get_edges_cached(u_b)
-            
-            # Check alle labels van beide kanten
-            for label in out_a.keys():
-                t_a = out_a[label]
-                t_b = out_b[label]
-                
-                is_internal_a = t_a in node_to_idx
-                is_internal_b = t_b in node_to_idx
-                
-                if is_internal_a and is_internal_b:
-                    # Beide gaan intern: check NON-DETERMINISME
-                    expected_t_b = pair_mapping[t_a]
-                    if t_b != expected_t_b:
-                        return None  # ❌ Non-determinisme gedetecteerd!
-                        
-                elif is_internal_a or is_internal_b:
-                    # Precies één gaat intern: GRENS-DISCREPANTIE
-                    return None  # ❌ Asymmetrische grens
+        # ===== CLASSIFICATIE =====
 
-        # FASE 3: CLASSIFICATIE - Nu weten we dat frontiers exclusief zijn!
-        internals: Set[Tuple[str, str]] = set()
-        frontiers: Set[Tuple[str, str]] = set()
-        
-        for p in visited_pairs:
-            n1, n2 = p
-            edges1 = self._get_edges_cached(n1)
-            
-            # OPTIMALISATIE: Set difference voor frontier check
-            targets_set = set(edges1.values())
-            is_frontier_a = bool(targets_set - nodes_in_a)
-            
-            if is_frontier_a:
-                frontiers.add(p)
+        internals = set()
+        frontiers = set()
+
+        for n1, n2 in visited_pairs:
+            out1 = self._get_edges_cached(n1)
+            has_external = any(t not in nodes_in_a for t in out1.values())
+
+            if has_external:
+                frontiers.add((n1, n2))
             else:
-                internals.add(p)
+                internals.add((n1, n2))
 
         return SubstructureMatch(
             start_nodes=(start_a, start_b),
             overlap_size=len(visited_pairs),
             internals=internals,
             frontiers=frontiers,
-            all_pairs=pair_set
+            all_pairs=set(visited_pairs)
         )
 
 def aggregate_canonical_results(matches: List[SubstructureMatch]) -> List[CanonicalSubstructure]:
@@ -288,12 +290,17 @@ def aggregate_canonical_results(matches: List[SubstructureMatch]) -> List[Canoni
     return final_results
 
 def calculate_savings(sub: CanonicalSubstructure) -> int:
-    """Berekent de 'winst' in termen van nodes."""
+    """
+    Berekent de 'winst' in termen van nodes.
+    Formule: (Oud aantal nodes) - (Nieuw aantal nodes)
+    """
     n = sub.overlap_size
     k = len(sub.locations)
+
     if k < 2: 
-        return -9999
-    return (n * k) - (n + k)
+        return 0
+    
+    return n * (k - 1)
 
 def prioritize_candidates(candidates: List[CanonicalSubstructure]) -> List[CanonicalSubstructure]:
     """Sorteert kandidaten op economische impact."""
@@ -345,7 +352,14 @@ def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[CanonicalSubstru
                 # Probeer match te vinden (met exclusive frontiers validatie!)
                 match = analyzer.find_maximal_overlap(n1, n2)
                 if match:
+                    # ---- COMMIT: pas nu de global equivalence closure bij ----
+                    # we doen dit *voordat* we match opslaan, zodat de closure
+                    # alleen valide, geaccepteerde structuren bevat.
+                    for a, b in match.all_pairs:
+                        analyzer.equivalence_closure.add_equivalence(a, b)
+
                     raw_results.append(match)
+
 
     # Aggregatie en prioritering
     canonical_candidates = aggregate_canonical_results(raw_results)
