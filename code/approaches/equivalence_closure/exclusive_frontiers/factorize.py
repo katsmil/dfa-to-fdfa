@@ -3,11 +3,6 @@ from typing import List, Set, Dict
 from collections import defaultdict
 from analyze import CanonicalSubstructure
 
-# --- HULPFUNCTIES --- 
-def _get_out_labels(G: nx.DiGraph, node: str) -> Dict[str, str]: 
-    """Geeft een dictionary van label -> target_node.""" 
-    return {data.get('label'): target for _, target, data in G.out_edges(node, data=True) if 'label' in data} 
-
 # --- SUBROUTINE LOGICA --- 
 def create_subroutine_structure(G: nx.DiGraph, 
                                 canonical_nodes: Set[str],
@@ -165,24 +160,24 @@ def _replace_instance_with_rc(G: nx.DiGraph,
 
     return instance_nodes
 
-def _is_deterministic_with_subroutine(G: nx.DiGraph, 
-                                     instance_nodes: Set[str], 
-                                     sub_mapping: Dict[str, str]) -> bool:
-    for inst_node in instance_nodes:
-        sub_node = sub_mapping.get(inst_node)
-        if not G.has_node(sub_node):
-            continue
+# def _is_deterministic_with_subroutine(G: nx.DiGraph, 
+#                                      instance_nodes: Set[str], 
+#                                      sub_mapping: Dict[str, str]) -> bool:
+#     for inst_node in instance_nodes:
+#         sub_node = sub_mapping.get(inst_node)
+#         if not G.has_node(sub_node):
+#             continue
 
-        sub_out_labels = _get_out_labels(G, sub_node)
-        inst_out_edges = _get_out_labels(G, inst_node)
+#         sub_out_labels = _get_out_labels(G, sub_node)
+#         inst_out_edges = _get_out_labels(G, inst_node)
 
-        for label, inst_target in inst_out_edges.items():
-            if inst_target in instance_nodes:
-                sub_target_of_inst = sub_mapping.get(inst_target)
-                if label in sub_out_labels:
-                    if sub_out_labels[label] != sub_target_of_inst:
-                        return False
-    return True
+#         for label, inst_target in inst_out_edges.items():
+#             if inst_target in instance_nodes:
+#                 sub_target_of_inst = sub_mapping.get(inst_target)
+#                 if label in sub_out_labels:
+#                     if sub_out_labels[label] != sub_target_of_inst:
+#                         return False
+#     return True
 
 def apply_factorization(G: nx.DiGraph, results: List[CanonicalSubstructure]):
     all_nodes_to_remove = set()
@@ -211,9 +206,10 @@ def apply_factorization(G: nx.DiGraph, results: List[CanonicalSubstructure]):
             current_mapping = dict(zip(loc.all_nodes, 
                                        [global_sub_mapping[cn] for cn in sub.canonical_nodes]))
 
-            # Check technische validiteit
-            if _is_valid_entry_structure(G, start_node, instance_nodes) and \
-               _is_deterministic_with_subroutine(G, instance_nodes, current_mapping):
+            # Check technische validiteit ---> we hebben deze controle al tijdens de analyze gedaan volgens mij.....
+            # if _is_valid_entry_structure(G, start_node, instance_nodes) and \
+            #    _is_deterministic_with_subroutine(G, instance_nodes, current_mapping):
+            if _is_valid_entry_structure(G, start_node, instance_nodes):
                 valid_locations_to_process.append((start_node, instance_nodes, current_mapping))
             else:
                 # Eén locatie is ongeldig -> we wijzen de hele groep af
