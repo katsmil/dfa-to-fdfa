@@ -46,67 +46,103 @@ def _is_valid_entry_structure(G: nx.DiGraph, start_node: str, instance_nodes: Se
                 return False
     return True
 
-def _process_transitions_and_update_subroutine(
-    G: nx.DiGraph,
-    instance_nodes: Set[str],
-    sub_mapping: Dict[str, str],
-    rc_node_id: str
-):
-    """
-    Bouwt de interne mapping op de RC node.
-    Mapping structuur: { label: { SUB_node_id: target_node_in_main } }
-    """
-    # De interne dispatch tabel
-    # We gebruiken de sub_node ID's voor de mapping
-    dispatch_map = defaultdict(dict)
+# def _process_transitions_and_update_subroutine(
+#     G: nx.DiGraph,
+#     instance_nodes: Set[str],
+#     sub_mapping: Dict[str, str],
+#     rc_node_id: str
+# ):
+#     """
+#     Bouwt de interne mapping op de RC node.
+#     Mapping structuur: { label: { SUB_node_id: target_node_in_main } }
+#     """
+#     # De interne dispatch tabel
+#     # We gebruiken de sub_node ID's voor de mapping
+#     dispatch_map = defaultdict(dict)
 
-    for inst_node in instance_nodes:
-        sub_node = sub_mapping.get(inst_node)
-        if not sub_node: continue
+#     for inst_node in instance_nodes:
+#         sub_node = sub_mapping.get(inst_node)
+#         if not sub_node: continue
         
-        for _, target, data in list(G.out_edges(inst_node, data=True)):
-            label = data.get("label")
-            if not label: continue
+#         for _, target, data in list(G.out_edges(inst_node, data=True)):
+#             label = data.get("label")
+#             if not label: continue
 
-            # EXIT: Transitie naar buiten de subroutine-instantie
+#             # EXIT: Transitie naar buiten de subroutine-instantie
+#             if target not in instance_nodes:
+#                 # Cruciaal: We mappen de label aan de SUB_node ID
+#                 dispatch_map[label][sub_node] = target
+                
+#                 # Voeg de transitie toe aan de RC node (puur label)
+#                 if not G.has_edge(rc_node_id, target, key=label):
+#                     G.add_edge(rc_node_id, target, label=label, key=label)
+
+#                 # Update de status van de subroutine-node
+#                 G.nodes[sub_node].update({
+#                     "peripheries": 2, "status": "accepting",
+#                     "fillcolor": "lightblue", "style": "filled",
+#                 })
+            
+#             # # INTERN: De interne logica van de subroutine (blueprint)
+#             # else:
+#             #     sub_target = sub_mapping.get(target)
+#             #     sub_out_labels = _get_out_labels(G, sub_node)
+#             #     if label not in sub_out_labels and sub_target:
+#             #         G.add_edge(sub_node, sub_target, **data)
+
+#     # Sla de map op als attribuut (voor de stack-machine logica)
+#     G.nodes[rc_node_id]['dispatch_map'] = dict(dispatch_map)
+
+#     # Visuele weergave op de RC node voor de DOT-file
+#     visual_map = []
+#     for label, sub_nodes_dict in dispatch_map.items():
+#         # Sorteer de SUB_ namen voor een consistente weergave
+#         sub_names = ", ".join(sorted(sub_nodes_dict.keys()))
+#         # Gebruik dubbele quotes rond het label voor de duidelijkheid
+#         visual_map.append(f'"{label}": {sub_names}')
+    
+#     # Gebruik \n in plaats van | voor een verticale lijst
+#     mapping_str = "\\n".join(visual_map)
+#     current_label = G.nodes[rc_node_id].get('label', 'RC')
+    
+#     # We zetten de mapping tussen vierkante haken op nieuwe regels
+#     G.nodes[rc_node_id]['label'] = f"{current_label}\\n[{mapping_str}]"
+
+def _process_exits(G: nx.MultiDiGraph, instance_nodes: Set[str], sub_map: Dict[str, str], rc_id: str):
+    """Handelt transities af die de subroutine verlaten."""
+    dispatch_map = defaultdict(dict)  # dispatch_map[symbol][sub_frontier_node] = target
+    
+    for inst_node in instance_nodes:
+        sub_node = sub_map[inst_node]
+        for _, target, data in list(G.out_edges(inst_node, data=True)):
+            label = data.get('label')
             if target not in instance_nodes:
-                # Cruciaal: We mappen de label aan de SUB_node ID
+                # δret(rc, sub_frontier_node, symbol) = target
                 dispatch_map[label][sub_node] = target
                 
-                # Voeg de transitie toe aan de RC node (puur label)
-                if not G.has_edge(rc_node_id, target, key=label):
-                    G.add_edge(rc_node_id, target, label=label, key=label)
-
-                # Update de status van de subroutine-node
+                # Edge van RC naar target in hoofdgraaf
+                if not G.has_edge(rc_id, target, key=label):
+                    G.add_edge(rc_id, target, label=label, key=label)
+                
+                # Markeer frontier nodes in subroutine
                 G.nodes[sub_node].update({
-                    "peripheries": 2, "status": "accepting",
-                    "fillcolor": "lightblue", "style": "filled",
+                    "peripheries": 2,
+                    "fillcolor": "lightblue",
+                    "style": "filled"
                 })
-            
-            # INTERN: De interne logica van de subroutine (blueprint)
-            else:
-                sub_target = sub_mapping.get(target)
-                sub_out_labels = _get_out_labels(G, sub_node)
-                if label not in sub_out_labels and sub_target:
-                    G.add_edge(sub_node, sub_target, **data)
 
-    # Sla de map op als attribuut (voor de stack-machine logica)
-    G.nodes[rc_node_id]['dispatch_map'] = dict(dispatch_map)
+    # --- Sla de UITVOERBARE dispatch map op als node attribuut ---
+    # Structuur: { symbol: { sub_frontier_node: target_node } }
+    G.nodes[rc_id]['dispatch_map'] = dict(dispatch_map)
 
-    # Visuele weergave op de RC node voor de DOT-file
-    visual_map = []
-    for label, sub_nodes_dict in dispatch_map.items():
-        # Sorteer de SUB_ namen voor een consistente weergave
-        sub_names = ", ".join(sorted(sub_nodes_dict.keys()))
-        # Gebruik dubbele quotes rond het label voor de duidelijkheid
-        visual_map.append(f'"{label}": {sub_names}')
-    
-    # Gebruik \n in plaats van | voor een verticale lijst
-    mapping_str = "\\n".join(visual_map)
-    current_label = G.nodes[rc_node_id].get('label', 'RC')
-    
-    # We zetten de mapping tussen vierkante haken op nieuwe regels
-    G.nodes[rc_node_id]['label'] = f"{current_label}\\n[{mapping_str}]"
+    # --- Visueel label met dispatch tabel ---
+    visual_rows = [
+        f'"{l}": {", ".join(nodes.keys())}'
+        for l, nodes in dispatch_map.items()
+    ]
+    mapping_str = "\\n".join(visual_rows)
+    if mapping_str:
+        G.nodes[rc_id]['label'] = f"{G.nodes[rc_id]['label']}\\n[{mapping_str}]"
 
 def _replace_instance_with_rc(G: nx.DiGraph,
                              start_node: str,
@@ -125,7 +161,7 @@ def _replace_instance_with_rc(G: nx.DiGraph,
             G.add_edge(u, rc_node_id, **data)
 
     # 2. Exits naar RC verplaatsen en subroutine verrijken
-    _process_transitions_and_update_subroutine(G, instance_nodes, sub_mapping, rc_node_id)
+    _process_exits(G, instance_nodes, sub_mapping, rc_node_id)
 
     return instance_nodes
 
