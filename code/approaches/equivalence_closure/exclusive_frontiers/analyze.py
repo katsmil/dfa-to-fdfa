@@ -1,22 +1,41 @@
 import networkx as nx
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Set, Tuple, List, Dict, Optional
+
+
+# ---------------------------------------------------------------------------
+# DATASTRUCTUREN
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class BlueprintEdge:
+    """Een interne edge in de abstracte subroutine, uitgedrukt als indices."""
+    source_idx: int
+    target_idx: int
+    label: str
 
 @dataclass(frozen=True)
 class MatchLocation:
     """Representeert één specifieke plek waar de structuur is gevonden."""
-    start_node: str          # Expliciete entry node van deze instantie
-    all_nodes: List[str]     # Volgorde komt overeen met canonical_nodes in CanonicalSubstructure
+    start_node: str       # Expliciete entry node van deze instantie
+    all_nodes: List[str]  # Volgorde komt overeen met canonical_nodes in CanonicalSubstructure
     internals: List[str]
     frontiers: List[str]
 
 @dataclass(frozen=True)
 class CanonicalSubstructure:
-    """De 'blauwdruk' van de herhaling."""
-    canonical_nodes: List[str]   # canonical_nodes[0] is ALTIJD de entry node (BFS-volgorde)
+    """
+    De 'blauwdruk' van de herhaling.
+    
+    canonical_nodes[0] is ALTIJD de entry node (BFS-volgorde van de eerste gevonden match).
+    blueprint_edges beschrijft de interne topologie als indices in canonical_nodes —
+    onafhankelijk van welke concrete nodes de subroutine invullen.
+    """
+    canonical_nodes: List[str]
     overlap_size: int
     locations: List[MatchLocation]
+    blueprint_edges: List[BlueprintEdge]  # Topologie als indices, zelfde als algoritme 1
 
 @dataclass(frozen=True)
 class SubstructureMatch:
@@ -26,9 +45,16 @@ class SubstructureMatch:
     internals: Set[Tuple[str, str]]
     frontiers: Set[Tuple[str, str]]
     all_pairs: Set[Tuple[str, str]]
+    # BFS-geordende A-kant nodes (start_a is index 0) — nodig voor blueprint reconstructie
+    nodes_a_ordered: Tuple[str, ...]
+    blueprint_edges: List[BlueprintEdge]
+
+
+# ---------------------------------------------------------------------------
+# HULPKLASSEN
+# ---------------------------------------------------------------------------
 
 class DFAUtils:
-    """Hulpmiddelen voor het analyseren van DFA-eigenschappen."""
     @staticmethod
     def is_accepting(G: nx.DiGraph, node: str) -> bool:
         data = G.nodes[node]
@@ -37,6 +63,7 @@ class DFAUtils:
     @staticmethod
     def get_labeled_edges(G: nx.DiGraph, node: str) -> Dict[str, str]:
         return {d['label']: v for _, v, d in G.out_edges(node, data=True) if 'label' in d}
+
 
 class EquivalenceClosure:
     """Union-Find voor Hopcroft-Karp equivalentie-sluitingen."""
@@ -56,7 +83,19 @@ class EquivalenceClosure:
     def are_equivalent(self, x: str, y: str) -> bool:
         return self._find(x) == self._find(y)
 
+
+# ---------------------------------------------------------------------------
+# ANALYSE ENGINE
+# ---------------------------------------------------------------------------
+
 class SubstructureAnalyzer:
+    """
+    BFS-gebaseerde bisimilariteitsanalyse met EquivalenceClosure-optimalisatie.
+
+    Slaat blueprint_edges op in SubstructureMatch zodat aggregate_canonical_results
+    op dezelfde topologie-gebaseerde hash kan werken als algoritme 1.
+    """
+
     def __init__(self, G: nx.DiGraph, min_overlap: int = 1):
         self.G = G
         self.min_overlap = min_overlap
@@ -75,7 +114,7 @@ class SubstructureAnalyzer:
             self._accepting_cache[node] = DFAUtils.is_accepting(self.G, node)
         return self._accepting_cache[node]
 
-    def get_node_signature(self, node: str) -> Tuple[bool, Tuple[Tuple[str, bool], ...]]:
+    def get_node_signature(self, node: str) -> Tuple:
         if node in self._signature_cache:
             return self._signature_cache[node]
         edges = self._get_edges_cached(node)
@@ -92,7 +131,7 @@ class SubstructureAnalyzer:
             return None
 
         queue = deque([(start_a, start_b)])
-        visited_pairs = []
+        visited_pairs = []   # BFS-volgorde: visited_pairs[0] = (start_a, start_b)
         pair_set = set()
         pair_mapping = {}
         reverse_mapping = {}
@@ -174,84 +213,123 @@ class SubstructureAnalyzer:
             else:
                 internals.add((n1, n2))
 
+        # Blueprint edges berekenen op basis van BFS-volgorde van A-kant
+        # visited_pairs is in BFS-volgorde, dus visited_pairs[0] = (start_a, start_b)
+        nodes_a_ordered = tuple(n1 for n1, n2 in visited_pairs)
+        node_to_idx = {node: i for i, node in enumerate(nodes_a_ordered)}
+
+        blueprint_edges = []
+        for i, (u_a, _) in enumerate(visited_pairs):
+            for label, t_a in self._get_edges_cached(u_a).items():
+                if t_a in node_to_idx:
+                    blueprint_edges.append(BlueprintEdge(i, node_to_idx[t_a], label))
+
         return SubstructureMatch(
             start_nodes=(start_a, start_b),
             overlap_size=len(visited_pairs),
             internals=internals,
             frontiers=frontiers,
-            all_pairs=set(visited_pairs)
+            all_pairs=set(visited_pairs),
+            nodes_a_ordered=nodes_a_ordered,      # BFS-volgorde bewaard
+            blueprint_edges=list(set(blueprint_edges))
         )
 
 
+# ---------------------------------------------------------------------------
+# AGGREGATIE
+# ---------------------------------------------------------------------------
+
 def aggregate_canonical_results(matches: List[SubstructureMatch]) -> List[CanonicalSubstructure]:
     """
-    Groepeert matches op canonieke structuur.
+    Groepeert matches op canonieke structuur via blueprint-gebaseerde hash.
 
-    BELANGRIJK: canonical_nodes bewaart de BFS-volgorde van de A-kant,
-    zodat canonical_nodes[0] altijd de entry node (start_a) is.
-    De B-kant locatie krijgt dezelfde positie-voor-positie volgorde via pair_map.
+    Zelfde aanpak als algoritme 1: de edges_tuple (gesorteerde interne topologie)
+    is de hash — niet de concrete node-namen. Hierdoor worden locaties gegroepeerd
+    op structuurvorm, ongeacht welke nodes toevallig de A-kant waren.
+
+    canonical_nodes = de A-kant nodes van de eerste match voor deze blueprint,
+    in BFS-volgorde (canonical_nodes[0] = entry node).
     """
-    # Key: BFS-geordende tuple van A-kant nodes (NIET gesorteerd)
-    groups = defaultdict(list)
+    # edges_tuple → lijst van matches met dezelfde topologie
+    structure_registry: Dict[tuple, List[SubstructureMatch]] = defaultdict(list)
+
     for m in matches:
-        # visited_pairs volgorde = BFS-volgorde, start_a is eerste
-        # Reconstrueer BFS-volgorde via start_nodes[0] als ankerpunt
-        a_nodes_ordered = [n1 for n1, n2 in sorted(
-            m.all_pairs,
-            key=lambda p: (p[0] != m.start_nodes[0], p[0])
-        )]
-        key = tuple(a_nodes_ordered)
-        groups[key].append(m)
+        edges_tuple = tuple(sorted(
+            (e.source_idx, e.target_idx, e.label)
+            for e in m.blueprint_edges
+        ))
+        structure_registry[edges_tuple].append(m)
 
     final_results = []
 
-    for canonical_key, related_matches in groups.items():
-        # canonical_nodes[0] = start_a = entry node (gegarandeerd door key-opbouw)
-        canonical_nodes = list(canonical_key)
+    for edges_tuple, related_matches in structure_registry.items():
+        first_m = related_matches[0]
+
+        # canonical_nodes = BFS-geordende A-kant van de eerste match
+        # nodes_a_ordered[0] = start_a = entry node (gegarandeerd)
+        canonical_nodes = list(first_m.nodes_a_ordered)
         canonical_start = canonical_nodes[0]
 
-        first_m = related_matches[0]
+        # Intern/frontier classificatie op basis van eerste match A-kant
         canonical_internals = [p[0] for p in first_m.internals]
         canonical_frontiers  = [p[0] for p in first_m.frontiers]
 
-        # Locatie A (de canonieke zijde zelf)
-        locations = [
-            MatchLocation(
-                start_node=canonical_start,
-                all_nodes=canonical_nodes,
-                internals=canonical_internals,
-                frontiers=canonical_frontiers
-            )
-        ]
-        seen_location_keys = {tuple(sorted(canonical_nodes))}
+        seen_location_keys: Set[tuple] = set()
+        locations = []
 
-        for m in related_matches:
-            pair_map = {n1: n2 for n1, n2 in m.all_pairs}
-
-            # B-kant nodes in dezelfde volgorde als canonical_nodes (positie-voor-positie)
-            loc_nodes    = [pair_map[cn] for cn in canonical_nodes]
-            loc_start    = pair_map[canonical_start]     # expliciete start node B-kant
-            loc_internals = [pair_map[cn] for cn in canonical_internals]
-            loc_frontiers = [pair_map[cn] for cn in canonical_frontiers]
-
-            loc_key = tuple(sorted(loc_nodes))
-            if loc_key not in seen_location_keys:
+        def _add_location(start: str, nodes: List[str], internals: List[str], frontiers: List[str]):
+            key = tuple(sorted(nodes))
+            if key not in seen_location_keys:
+                seen_location_keys.add(key)
                 locations.append(MatchLocation(
-                    start_node=loc_start,
-                    all_nodes=loc_nodes,
-                    internals=loc_internals,
-                    frontiers=loc_frontiers
+                    start_node=start,
+                    all_nodes=nodes,
+                    internals=internals,
+                    frontiers=frontiers
                 ))
-                seen_location_keys.add(loc_key)
+
+        # Voeg A-kant en B-kant van elke match toe als afzonderlijke locaties
+        for m in related_matches:
+            pair_map_a_to_b = {n1: n2 for n1, n2 in m.all_pairs}
+            pair_map_b_to_a = {n2: n1 for n1, n2 in m.all_pairs}
+
+            # A-kant: positie-voor-positie via nodes_a_ordered
+            a_nodes   = list(m.nodes_a_ordered)
+            a_start   = m.start_nodes[0]
+            a_int_set = {p[0] for p in m.internals}
+            a_fro_set = {p[0] for p in m.frontiers}
+            _add_location(
+                a_start,
+                a_nodes,
+                [n for n in a_nodes if n in a_int_set],
+                [n for n in a_nodes if n in a_fro_set]
+            )
+
+            # B-kant: gespiegeld via pair_map, zelfde positie-volgorde als A-kant
+            b_nodes = [pair_map_a_to_b[n] for n in m.nodes_a_ordered]
+            b_start = m.start_nodes[1]
+            b_int_set = {p[1] for p in m.internals}
+            b_fro_set = {p[1] for p in m.frontiers}
+            _add_location(
+                b_start,
+                b_nodes,
+                [n for n in b_nodes if n in b_int_set],
+                [n for n in b_nodes if n in b_fro_set]
+            )
 
         final_results.append(CanonicalSubstructure(
             canonical_nodes=canonical_nodes,
             overlap_size=len(canonical_nodes),
-            locations=locations
+            locations=locations,
+            blueprint_edges=first_m.blueprint_edges   # topologie is identiek voor alle matches in groep
         ))
 
     return final_results
 
+
+# ---------------------------------------------------------------------------
+# PRIORITERING & ENTRY POINT
+# ---------------------------------------------------------------------------
 
 def calculate_savings(sub: CanonicalSubstructure) -> int:
     n = sub.overlap_size
