@@ -19,8 +19,8 @@ class DFAExecutor:
     
     def __init__(self, G: nx.MultiDiGraph):
         self.G = self._normalize_labels(G)
+        self.G = self._normalize_node_attributes(self.G)
         self.start_node = self._find_start_node()
-        # Volg epsilon-transities naar de echte start node
         self.start_node = self._follow_epsilon_transitions(self.start_node)
         self.accepting_nodes = self._find_accepting_nodes()
     
@@ -172,32 +172,34 @@ class DFAExecutor:
     def _get_subroutine_entry(self, rc_node: str) -> Optional[str]:
         """
         Vind de entry node van de subroutine die bij deze RC hoort.
-        In de gefactoriseerde graaf zijn dit de nodes met cluster attribuut.
+        Leest de clusternaam uit het RC label via regex (bijv. 'RC: subroutine_1\n[...]' → 'subroutine_1').
+        De entry node heeft label='S0' en het bijbehorende cluster attribuut.
         """
-        # Probeer eerst de clusternaam uit het RC label te halen (bijv. 'subroutine_1')
+        import re
+
         node_data = self.G.nodes.get(rc_node, {})
         label = node_data.get('label', '')
         cluster_name = None
-        if isinstance(label, str) and 'subroutine' in label:
-            # zoek naar woord 'subroutine_<id>' in label
-            parts = label.replace('\n', ' ').split()
-            for p in parts:
-                if p.startswith('subroutine'):
-                    cluster_name = p
-                    break
 
-        # Als we een clusternaam hebben, zoek naar node met precies die cluster
+        if isinstance(label, str):
+            # Extract "subroutine_X" uit "RC: subroutine_X\n[...]"
+            # Dit voorkomt dat de \n en bracket-inhoud meekomen
+            match = re.search(r'RC:\s*(subroutine_\w+)', label)
+            if match:
+                cluster_name = match.group(1)
+
         if cluster_name:
+            # Zoek de entry node: heeft het juiste cluster én label S0
             for node in self.G.nodes():
                 nd = self.G.nodes[node]
-                if nd.get('cluster') == cluster_name and str(node).endswith('_0'):
+                if nd.get('cluster') == cluster_name and nd.get('label') == 'S0':
                     return node
 
-        # Fallback: zoek naar nodes die een cluster attribuut bevatten met 'subroutine'
+        # Fallback: eerste S0-node in een willekeurige subroutine
         for node in self.G.nodes():
             nd = self.G.nodes[node]
             cluster = nd.get('cluster')
-            if isinstance(cluster, str) and 'subroutine' in cluster and str(node).endswith('_0'):
+            if isinstance(cluster, str) and 'subroutine' in cluster and nd.get('label') == 'S0':
                 return node
 
         return None
@@ -241,6 +243,26 @@ class DFAExecutor:
                 label = label.strip()
                 # Update the edge label
                 G_norm[u][v][key]['label'] = label
+        
+        return G_norm
+    
+    def _normalize_node_attributes(self, G: nx.MultiDiGraph) -> nx.MultiDiGraph:
+        """
+        Strip surrounding quotes from node attribute values.
+        pydot leest 'cluster="subroutine_1"' in als '"subroutine_1"' (met quotes).
+        """
+        import copy
+        G_norm = copy.deepcopy(G)
+        
+        for node in G_norm.nodes():
+            nd = G_norm.nodes[node]
+            for attr in list(nd.keys()):
+                val = nd[attr]
+                if isinstance(val, str):
+                    # Strip surrounding quotes
+                    if len(val) >= 2 and ((val[0] == '"' and val[-1] == '"') or
+                                        (val[0] == "'" and val[-1] == "'")):
+                        nd[attr] = val[1:-1]
         
         return G_norm
 
@@ -372,9 +394,14 @@ def compare_graphs_on_string(G_original: nx.MultiDiGraph, G_factored: nx.MultiDi
     """
     # Normalize input_string to list of symbols
     if isinstance(input_string, str):
-        symbols = list(input_string)
+        # "entry_alpha v z" → ["entry_alpha", "v", "z"]
+        symbols = input_string.split()
     else:
-        symbols = list(input_string)
+        # Elk element in de lijst kan zelf nog een spatie-gescheiden string zijn
+        # ["entry_alpha v z"] → ["entry_alpha", "v", "z"]
+        symbols = []
+        for item in input_string:
+            symbols.extend(str(item).split())
 
     exec_orig = DFAExecutor(G_original)
     exec_fact = DFAExecutor(G_factored)
@@ -408,7 +435,7 @@ if __name__ == "__main__":
     if len(sys.argv) >= 4:
         orig_path = sys.argv[1]
         fact_path = sys.argv[2]
-        input_str = sys.argv[3]
+        input_str = sys.argv[3:]
 
         G_original = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(orig_path))
         G_factored = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(fact_path))
