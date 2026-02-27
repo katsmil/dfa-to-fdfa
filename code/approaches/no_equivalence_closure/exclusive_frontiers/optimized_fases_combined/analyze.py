@@ -162,6 +162,8 @@ class SubstructureAnalyzer:
                     blueprint_edges.append(BlueprintEdge(i, node_to_idx[t_a], label))
 
         return {
+            'start_a': start_a,
+            'start_b': start_b,
             'nodes_a': tuple(nodes_a),
             'nodes_b': tuple([p[1] for p in visited_pairs]),
             'blueprint_edges': list(set(blueprint_edges))
@@ -212,10 +214,10 @@ def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[CanonicalSubstru
                     
                     # Voeg beide locaties toe onder deze canonical hash
                     structure_registry[edges_tuple].add(
-                        MatchLocation(match['nodes_a'][0], match['nodes_a'])
+                        MatchLocation(match['start_a'], match['nodes_a'])
                     )
                     structure_registry[edges_tuple].add(
-                        MatchLocation(match['nodes_b'][0], match['nodes_b'])
+                        MatchLocation(match['start_b'], match['nodes_b'])
                     )
                     
                     # Blueprint hoeft maar 1x opgeslagen
