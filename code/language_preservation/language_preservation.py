@@ -97,23 +97,25 @@ class DFAExecutor:
                     current = subroutine_start
                     trace.append(f"  CALL {current} (stack: {len(stack)})")
             
-            # Probeer transitie te nemen
+            # Probeer interne transitie δint(current, symbol)
             next_node = self._take_transition(current, symbol)
             
             if next_node is None:
-                # Geen transitie beschikbaar
-                # Check of we in een frontier zijn en moeten returnen
+                # Return transitie: frontier conditie + stack niet leeg
                 if stack and self._is_frontier(current):
-                    # RETURN: Pop stack en probeer vanaf RC
-                    rc_node = stack.pop()
-                    trace.append(f"  RETURN to {rc_node}")
-                    next_node = self._take_transition(rc_node, symbol)
+                    rc_node = stack[-1]  # peek eerst
                     
-                    if next_node is None:
-                        trace.append(f"  REJECT: No transition for '{symbol}' from {rc_node}")
+                    # δret(rc_node, current_sub_node, symbol) opzoeken
+                    next_node = self._dispatch(rc_node, current, symbol)
+                    
+                    if next_node is not None:
+                        stack.pop()  # alleen poppen als dispatch slaagt
+                        trace.append(f"  RETURN via δret({rc_node}, {current}, '{symbol}') → {next_node}")
+                    else:
+                        trace.append(f"  REJECT: δret({rc_node}, {current}, '{symbol}') ongedefinieerd")
                         return False, "\n".join(trace)
                 else:
-                    trace.append(f"  REJECT: No transition for '{symbol}' from {current}")
+                    trace.append(f"  REJECT: δint({current}, '{symbol}') ongedefinieerd, geen return mogelijk")
                     return False, "\n".join(trace)
             
             current = next_node
@@ -135,6 +137,41 @@ class DFAExecutor:
         trace.append(f"\nFinal: {current} ({'ACCEPT' if accepted else 'REJECT'})")
         
         return accepted, "\n".join(trace)
+    
+    def _dispatch(self, rc_node: str, frontier_node: str, symbol: str) -> Optional[str]:
+        """
+        δret(rc_node, frontier_node, symbol) → target
+        """
+        import ast
+
+        nd = self.G.nodes.get(rc_node, {})
+        dispatch_map = nd.get('dispatch_map', {})
+
+        # Als de dispatch_map een string is (na .dot serialisatie), parse terug naar dict
+        if isinstance(dispatch_map, str):
+            try:
+                dispatch_map = ast.literal_eval(dispatch_map)
+            except (ValueError, SyntaxError):
+                return None
+
+        # Sleutels kunnen '"z"' zijn in plaats van 'z' door pydot quote-wrapping
+        # Normaliseer: strip omringende quotes van alle sleutels
+        def strip_quotes(s: str) -> str:
+            s = s.strip()
+            while len(s) >= 2 and ((s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'")):
+                s = s[1:-1].strip()
+            return s
+
+        # Normaliseer de buitenste sleutels (symbolen)
+        normalized_map = {strip_quotes(k): v for k, v in dispatch_map.items()}
+
+        symbol_map = normalized_map.get(symbol, {})
+
+        # symbol_map values kunnen ook quotes hebben, strip die ook
+        if isinstance(symbol_map, dict):
+            return symbol_map.get(frontier_node)
+        
+        return None
     
     def _follow_epsilon_to_accepting(self, node: str) -> str:
         """Volg epsilon-transities tot we een accepting node vinden (of geen epsilon meer)"""
@@ -169,38 +206,85 @@ class DFAExecutor:
                 return self._follow_epsilon_transitions(target)
         return None
     
+    # DIT IS DE MOOIERE OPLOSSING DENK IK::
+    # def _get_subroutine_entry(self, rc_node: str) -> Optional[str]:
+    #     """
+    #     Vind de entry node van de subroutine die bij deze RC hoort.
+    #     Leest de clusternaam uit het RC label via regex (bijv. 'RC: subroutine_1\n[...]' → 'subroutine_1').
+    #     De entry node heeft label='S0' en het bijbehorende cluster attribuut.
+    #     """
+    #     import re
+
+    #     node_data = self.G.nodes.get(rc_node, {})
+    #     label = node_data.get('label', '')
+    #     cluster_name = None
+
+    #     if isinstance(label, str):
+    #         # Extract "subroutine_X" uit "RC: subroutine_X\n[...]"
+    #         # Dit voorkomt dat de \n en bracket-inhoud meekomen
+    #         match = re.search(r'RC:\s*(subroutine_\w+)', label)
+    #         if match:
+    #             cluster_name = match.group(1)
+
+    #     if cluster_name:
+    #         # Zoek de entry node: heeft het juiste cluster én label S0
+    #         for node in self.G.nodes():
+    #             nd = self.G.nodes[node]
+    #             if nd.get('cluster') == cluster_name and nd.get('label') == 'S0':
+    #                 return node
+
+    #     # Fallback: eerste S0-node in een willekeurige subroutine
+    #     for node in self.G.nodes():
+    #         nd = self.G.nodes[node]
+    #         cluster = nd.get('cluster')
+    #         if isinstance(cluster, str) and 'subroutine' in cluster and nd.get('label') == 'S0':
+    #             return node
+
+    #     return None
+
     def _get_subroutine_entry(self, rc_node: str) -> Optional[str]:
-        """
-        Vind de entry node van de subroutine die bij deze RC hoort.
-        Leest de clusternaam uit het RC label via regex (bijv. 'RC: subroutine_1\n[...]' → 'subroutine_1').
-        De entry node heeft label='S0' en het bijbehorende cluster attribuut.
-        """
-        import re
+        import ast
 
-        node_data = self.G.nodes.get(rc_node, {})
-        label = node_data.get('label', '')
+        nd = self.G.nodes.get(rc_node, {})
+
+        # Stap 1: Lees dispatch_map (kan string zijn na .dot round-trip)
+        dispatch_map = nd.get('dispatch_map', {})
+        if isinstance(dispatch_map, str):
+            try:
+                dispatch_map = ast.literal_eval(dispatch_map)
+            except (ValueError, SyntaxError):
+                dispatch_map = {}
+
+        # Stap 2: Haal cluster naam op via een frontier node in de dispatch_map
+        # De frontier nodes (bijv. SUB_a_B1_a_C1) hebben het correcte cluster attribuut
         cluster_name = None
+        for symbol_map in dispatch_map.values():
+            if not isinstance(symbol_map, dict):
+                continue
+            for frontier_node in symbol_map.keys():
+                fn_data = self.G.nodes.get(frontier_node, {})
+                c = fn_data.get('cluster')
+                if c:
+                    cluster_name = c
+                    break
+            if cluster_name:
+                break
 
-        if isinstance(label, str):
-            # Extract "subroutine_X" uit "RC: subroutine_X\n[...]"
-            # Dit voorkomt dat de \n en bracket-inhoud meekomen
-            match = re.search(r'RC:\s*(subroutine_\w+)', label)
-            if match:
-                cluster_name = match.group(1)
-
+        # Stap 3: Vind entry node via __start_{cluster} dummy node
         if cluster_name:
-            # Zoek de entry node: heeft het juiste cluster én label S0
-            for node in self.G.nodes():
-                nd = self.G.nodes[node]
-                if nd.get('cluster') == cluster_name and nd.get('label') == 'S0':
-                    return node
+            start_dummy = f"__start_{cluster_name}"
+            if self.G.has_node(start_dummy):
+                for _, target in self.G.out_edges(start_dummy):
+                    return self._follow_epsilon_transitions(target)
 
-        # Fallback: eerste S0-node in een willekeurige subroutine
-        for node in self.G.nodes():
-            nd = self.G.nodes[node]
-            cluster = nd.get('cluster')
-            if isinstance(cluster, str) and 'subroutine' in cluster and nd.get('label') == 'S0':
-                return node
+            # Fallback: zoek node in cluster waarvan alle predecessors dummy nodes zijn
+            for node in self.G.nodes():
+                node_data = self.G.nodes[node]
+                if node_data.get('cluster') != cluster_name:
+                    continue
+                predecessors = list(self.G.predecessors(node))
+                if predecessors and all('__start_' in str(p) for p in predecessors):
+                    return node
 
         return None
     
