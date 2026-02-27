@@ -27,27 +27,37 @@ def create_subroutine_structure(G: nx.MultiDiGraph, sub: CanonicalSubstructure, 
 
 def _process_exits(G: nx.MultiDiGraph, instance_nodes: Set[str], sub_map: Dict[str, str], rc_id: str):
     """Handelt transities af die de subroutine verlaten."""
-    dispatch_map = defaultdict(dict)
+    dispatch_map = defaultdict(dict)  # dispatch_map[symbol][sub_frontier_node] = target
     
     for inst_node in instance_nodes:
         sub_node = sub_map[inst_node]
         for _, target, data in list(G.out_edges(inst_node, data=True)):
             label = data.get('label')
             if target not in instance_nodes:
-                # Markeer de exit in de dispatch_map
+                # δret(rc, sub_frontier_node, symbol) = target
                 dispatch_map[label][sub_node] = target
                 
-                # Voeg edge toe vanaf RC naar de target in de hoofdgraaf
+                # Edge van RC naar target in hoofdgraaf
                 if not G.has_edge(rc_id, target, key=label):
                     G.add_edge(rc_id, target, label=label, key=label)
                 
-                # Maak de exit node in de subroutine visueel herkenbaar (accepting state)
-                G.nodes[sub_node].update({"peripheries": 2, "fillcolor": "lightblue", "style": "filled"})
+                # Markeer frontier nodes in subroutine
+                G.nodes[sub_node].update({
+                    "peripheries": 2,
+                    "fillcolor": "lightblue",
+                    "style": "filled"
+                })
 
-    # Update RC label met de dispatch tabel (visueel)
-    visual_rows = [f'"{l}": {", ".join(nodes.keys())}' for l, nodes in dispatch_map.items()]
+    # --- Sla de UITVOERBARE dispatch map op als node attribuut ---
+    # Structuur: { symbol: { sub_frontier_node: target_node } }
+    G.nodes[rc_id]['dispatch_map'] = dict(dispatch_map)
+
+    # --- Visueel label met dispatch tabel ---
+    visual_rows = [
+        f'"{l}": {", ".join(nodes.keys())}'
+        for l, nodes in dispatch_map.items()
+    ]
     mapping_str = "\\n".join(visual_rows)
-    # Alleen toevoegen als er exits zijn, anders blijft het label schoon
     if mapping_str:
         G.nodes[rc_id]['label'] = f"{G.nodes[rc_id]['label']}\\n[{mapping_str}]"
 
