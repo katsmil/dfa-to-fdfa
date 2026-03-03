@@ -24,8 +24,11 @@
             "name": "🔬 Equivalence Closure (exclusive frontiers)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/approaches/equivalence_closure/exclusive_frontiers/main.py",
+            "program": "${workspaceFolder}/src/approaches/equivalence_closure/exclusive_frontiers/main.py",
             "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
             "args": [
                 "${input:inputFile}"
             ]
@@ -34,8 +37,11 @@
             "name": "🔬 No Equivalence Closure - Exclusive (Optimized + Fases Combined)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/approaches/no_equivalence_closure/exclusive_frontiers/optimized_fases_combined/main.py",
+            "program": "${workspaceFolder}/src/approaches/no_equivalence_closure/exclusive_frontiers/optimized_fases_combined/main.py",
             "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
             "args": [
                 "${input:inputFile}"
             ]
@@ -44,8 +50,11 @@
             "name": "🔬 No Equivalence Closure - Exclusive (Optimized + Fases Separated)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/approaches/no_equivalence_closure/exclusive_frontiers/optimized_fases_separated/main.py",
+            "program": "${workspaceFolder}/src/approaches/no_equivalence_closure/exclusive_frontiers/optimized_fases_separated/main.py",
             "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
             "args": [
                 "${input:inputFile}"
             ]
@@ -74,14 +83,17 @@
             "name": "📊 Benchmark (beide varianten)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/benchmark/benchmark.py",
-            "console": "integratedTerminal"
+            "program": "${workspaceFolder}/src/benchmark/benchmark.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
         },
         {
             "name": "🧪 Language Preservation Tester",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/language_preservation/language_preservation.py",
+            "program": "${workspaceFolder}/src/language_preservation/language_preservation.py",
             "console": "integratedTerminal",
             "args": [
                 "${input:lp_orig}",

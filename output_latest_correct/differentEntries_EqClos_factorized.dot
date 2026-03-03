@@ -1,0 +1,31 @@
+digraph "differentEntries" {
+qf [shape=doublecircle];
+__start0;
+q0;
+a6;
+b6;
+a5;
+b1;
+SUB_a1_a1 [cluster="subroutine_a1_1", label=a1];
+SUB_a1_a4 [cluster="subroutine_a1_1", label=a4, peripheries=2, status=accepting, fillcolor=lightblue, style=filled];
+SUB_a1_a3 [cluster="subroutine_a1_1", label=a3];
+SUB_a1_a2 [cluster="subroutine_a1_1", label=a2];
+__start_subroutine_a1_1 [label="", shape=none, width=0, height=0, cluster="subroutine_a1_1"];
+RC_a1 [shape=box, style=filled, fillcolor=orange, label="RC: Sub_a1\n[\"\"x\"\": SUB_a1_a4]", dispatch_map="{'\"x\"': {'SUB_a1_a4': 'a5'}}"];
+RC_b2 [shape=box, style=filled, fillcolor=orange, label="RC: Sub_a1\n[\"\"x\"\": SUB_a1_a4]", dispatch_map="{'\"x\"': {'SUB_a1_a4': 'b6'}}"];
+__start0 -> q0 [key=0];
+q0 -> RC_a1 [key=0, label="a"];
+q0 -> RC_b2 [key=0, label="b"];
+a6 -> qf [key=0, label="a"];
+a6 -> RC_a1 [key=0, label="x"];
+b6 -> qf [key=0, label="b"];
+b6 -> b1 [key=0, label="x"];
+a5 -> a6 [key=0, label="x"];
+b1 -> RC_b2 [key=0, label="x"];
+SUB_a1_a1 -> SUB_a1_a2 [key=0, label="x"];
+SUB_a1_a3 -> SUB_a1_a4 [key=0, label="x"];
+SUB_a1_a2 -> SUB_a1_a3 [key=0, label="x"];
+__start_subroutine_a1_1 -> SUB_a1_a1 [key=0];
+RC_a1 -> a5 [key="x", label="x"];
+RC_b2 -> b6 [key="x", label="x"];
+}
