@@ -5,6 +5,7 @@ from typing import Set, Tuple, List, Dict
 
 from approaches.shared.base_analyzer import BaseSubstructureAnalyzer
 from approaches.shared.shared_types import MatchLocation, CanonicalSubstructure, BlueprintEdge
+from approaches.shared.shared_utils import build_signature_buckets
 
 # ---------------------------------------------------------------------------
 # DATASTRUCTUREN
@@ -153,10 +154,7 @@ def _prioritize_candidates(candidates: List[CanonicalSubstructure]) -> List[Cano
 
 def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[CanonicalSubstructure]:
     analyzer = SubstructureAnalyzer(G, min_overlap=min_size)
-    buckets: Dict[tuple, List[str]] = defaultdict(list)
-
-    for node in G.nodes():
-        buckets[analyzer._get_node_signature(node)].append(node)
+    buckets = build_signature_buckets(analyzer)
 
     raw_results = []
     compared: Set[Tuple[str, str]] = set()

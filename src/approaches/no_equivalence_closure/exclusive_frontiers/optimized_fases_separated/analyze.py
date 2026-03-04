@@ -4,7 +4,7 @@ from typing import Set, Tuple, List, Dict, Optional
 
 from approaches.shared.base_analyzer import BaseSubstructureAnalyzer
 from approaches.shared.shared_types import MatchLocation, CanonicalSubstructure, BlueprintEdge
-from approaches.shared.shared_utils import count_non_overlapping_locations, get_internals_and_frontiers
+from approaches.shared.shared_utils import count_non_overlapping_locations, get_internals_and_frontiers, build_signature_buckets
 
 # ---------------------------------------------------------------------------
 # ANALYSE ENGINE
@@ -110,12 +110,7 @@ class SubstructureAnalyzer(BaseSubstructureAnalyzer):
 
 def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[CanonicalSubstructure]:
     analyzer = SubstructureAnalyzer(G, min_overlap=min_size)
-
-    buckets: Dict[tuple, List[str]] = defaultdict(list)
-    for node in G.nodes():
-        buckets[analyzer._get_node_signature(node)].append(node)
-    buckets = {k: sorted(v) for k, v in buckets.items() if len(v) >= 2}
-
+    buckets = build_signature_buckets(analyzer)
 
     structure_registry: Dict[tuple, Set[MatchLocation]] = defaultdict(set)
     blueprint_store: Dict[tuple, List[BlueprintEdge]] = {}

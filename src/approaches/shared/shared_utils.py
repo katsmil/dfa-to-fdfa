@@ -1,4 +1,5 @@
-from typing import List, Set, Tuple
+from collections import defaultdict
+from typing import Dict, List, Set, Tuple
 
 from approaches.shared.shared_types import MatchLocation
 
@@ -60,3 +61,9 @@ def get_internals_and_frontiers(analyzer, nodes: Tuple[str, ...]) -> Tuple[Tuple
         else:
             internals.append(n)
     return tuple(internals), tuple(frontiers)
+
+def build_signature_buckets(analyzer) -> Dict[tuple, List[str]]:
+    buckets = defaultdict(list)
+    for node in analyzer.G.nodes():
+        buckets[analyzer._get_node_signature(node)].append(node)
+    return {k: sorted(v) for k, v in buckets.items() if len(v) >= 2}
