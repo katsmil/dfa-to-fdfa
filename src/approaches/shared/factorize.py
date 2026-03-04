@@ -33,11 +33,14 @@ def _create_subroutine_structure(G: nx.MultiDiGraph,
     G.add_edge(start_dummy, sub_mapping[sub.canonical_nodes[0]])
 
     idx_to_sub = {j: sub_mapping[node] for j, node in enumerate(sub.canonical_nodes)}
+    existing_edges: set = set()
     for edge in sub.blueprint_edges:
         src = idx_to_sub[edge.source_idx]
         tgt = idx_to_sub[edge.target_idx]
-        if not G.has_edge(src, tgt):
+        key = (src, tgt, edge.label)
+        if key not in existing_edges:
             G.add_edge(src, tgt, label=edge.label)
+            existing_edges.add(key)
 
     return cluster_name, sub_mapping
 
