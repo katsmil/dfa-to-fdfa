@@ -266,7 +266,7 @@ class BenchmarkSuite:
             report.append(f"  NoEquiv:  {no_eq.nodes_before} → {no_eq.nodes_after} nodes ({no_eq.compression_ratio:.1%})")
             report.append(f"  Equiv:    {eq.nodes_before} → {eq.nodes_after} nodes ({eq.compression_ratio:.1%})")
             
-            better_compression = "NoEquiv" if no_eq.compression_ratio < eq.compression_ratio else "Equiv"
+            better_compression = "NoEquiv" if no_eq.compression_ratio > eq.compression_ratio else "Equiv"
             report.append(f"  → Better compression: {better_compression}")
             
             # # KWALITEIT
@@ -365,7 +365,7 @@ if __name__ == "__main__":
     # - 'large'           : Grotere real-world voorbeelden (url_parser, etc.)
     # - 'test_automata'   : Alle deel_*.dot files uit input/test_automata/
     # - 'custom'          : Aangepaste list - voeg je eigen testen toe
-    TEST_MODE = 'joshua'  # ← WIJZIG DEZE LIJN
+    TEST_MODE = 'large'  # ← WIJZIG DEZE LIJN
     
     if TEST_MODE == 'joshua':
         # Kleine testcases voor snelle feedback
@@ -381,7 +381,11 @@ if __name__ == "__main__":
     elif TEST_MODE == 'large':
         # Grotere real-world voorbeelden
         test_configs = [
-            ("url_parser", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world_examples/url_parser.dot"),
+            # ("url-parser", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world_examples/url-parser.dot"),
+            ("url-53", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/url-53-reduced-percent.dot"),
+            ("url-170", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/url-170-reduced-https.dot"),
+            ("url-271", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/url-271-reduced-ipv6-noslash.dot"),
+            ("url-442", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/url-442-reduced-ipv6.dot"),
             # Voeg hier meer grote files toe:
             # ("other_large", "/path/to/other_large.dot"),
         ]
