@@ -153,8 +153,9 @@ def _filter_soft(G: nx.MultiDiGraph,
                   sub_mapping: Dict[str, str],
                   processed_nodes: Set[str]) -> Tuple[List, bool]:
     """
-    Zachte filter (NoEquivalenceClosure): ongeldige of overlappende
-    locaties worden overgeslagen, de rest wordt wel geprobeerd.
+    Zachte filter (NoEquivalenceClosure): ongeldige (namelijk incoming edges op nodes <> startnode)
+    of overlappende locaties (want al eerder gefactoriseerd) worden overgeslagen, 
+    de rest wordt wel geprobeerd.
     """
     valid = []
     nodes_in_batch: Set[str] = set()
