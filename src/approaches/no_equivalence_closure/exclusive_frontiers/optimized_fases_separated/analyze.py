@@ -107,7 +107,10 @@ class SubstructureAnalyzer(BaseSubstructureAnalyzer):
 # ---------------------------------------------------------------------------
 # ENTRY POINT
 # ---------------------------------------------------------------------------
-
+# Voor nu staat min_size op 2 maar als de overlap 2 groot is dan moet het aantal plekken 
+# waar deze overlap voorkomt 3 zijn, anders is de compressio ratio niet positief.
+# In het geval de overlap >=3 dan is het al voldoende als deze overlap op 2 plekken voorkomt, 
+# omdat de compressie ratio dan al positief is.
 def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[CanonicalSubstructure]:
     analyzer = SubstructureAnalyzer(G, min_overlap=min_size)
     buckets = build_signature_buckets(analyzer)
