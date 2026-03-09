@@ -1,6 +1,6 @@
 # DFA Compressie Benaderingen
 
-Dit project vergelijkt twee benaderingen voor het comprimeren van cyclische automaten door herhaalde substructuren te detecteren en te factoriseren.
+Dit project vergelijkt twee benaderingen voor het comprimeren van algemene automaten door herhaalde substructuren te detecteren en te factoriseren.
 
 ---
 
@@ -14,6 +14,8 @@ code/
 ├── shared/                     # Gedeelde utilities
 ├── tools/                      # Standalone scripts
 ├── benchmark/                  # Variant-agnostisch test framework
+├── language_preservation/      # Test op taalbehoud
+│   └── language_preservation.py
 ├── archive/                    # Oud experimenteel werk
 └── APPROACHES.md               # Dit bestand
 ```
@@ -78,6 +80,7 @@ python approaches/no_equivalence_closure/hybrid_frontiers/main.py <input.dot>
 
 ## 📊 Benchmarking
 
+
 Beide benaderingen kunnen objectief met elkaar vergeleken worden:
 
 ```bash
@@ -94,6 +97,20 @@ Dit framework:
 
 ---
 
+## 🧪 Language Preservation
+
+**Locatie**: `language_preservation/language_preservation.py`
+
+Dit script test of de gefactoriseerde automaat dezelfde taal accepteert als het origineel. Dit is essentieel voor correctheidsbewijs en variant-onafhankelijk.
+
+### Gebruik
+```bash
+python language_preservation/language_preservation.py <orig.dot> <factored.dot> <string>
+```
+Je kunt hiermee controleren of de factorisatie geen fouten introduceert. Het script accepteert een origineel .dot-bestand, een gefactoreerd .dot-bestand en een input string.
+
+---
+
 ## 🛠️ Shared Utilities
 
 **Locatie**: `shared/`
@@ -104,17 +121,6 @@ Gedeelde code die door beide benaderingen gebruikt wordt:
 - `utils/`: Algemene nutsfuncties
 
 Deze modules worden niet duplicated - beiden importeren ze van dezelfde plaats.
-
----
-
-## 🔧 Standalone Tools
-
-**Locatie**: `tools/`
-
-Standalone analyse scripts:
-- `isomorphism_detector.py`: Detecteer isomorfe subgrafen
-- `scc_visualize.py`: Visualiseer strongly connected components
-- `natural_loop_isomorphism.py`: Analyse natuurlijke loops
 
 ---
 
@@ -156,13 +162,13 @@ python approaches/no_equivalence_closure/exclusive_frontiers/optimized/main.py i
 
 ## 📝 Welke variant kiezen?
 
-| Criterium | Equivalence Closure | No Equivalence Closure |
-|-----------|-------------------|----------------------|
-| **Speed** | ⭐⭐⭐ (Lineair) | ⭐⭐ (Langzamer) |
-| **Compressie** | ⭐⭐⭐ (Grote structuren) | ⭐⭐⭐ (Fijn-granulair) |
-| **Complexiteit** | ⭐⭐⭐ (Simpel) | ⭐⭐ (Veel heuristieken) |
-| **Kleine automaten** | ⭐⭐ | ⭐⭐⭐ |
-| **Grote automaten** | ⭐⭐⭐ | ⭐⭐ |
+| Criterium         | Equivalence Closure         | No Equivalence Closure         |
+|-------------------|----------------------------|-------------------------------|
+| Snelheid          | Lineair, snel              | Langzamer                     |
+| Compressie        | Grote structuren           | Fijn-granulair, meer winst    |
+| Complexiteit      | Simpel                     | Meer heuristieken             |
+| Kleine automaten  | Minder optimaal            | Zeer geschikt                 |
+| Grote automaten   | Zeer geschikt              | Minder optimaal               |
 
 ---
 
@@ -197,5 +203,3 @@ from shared.dominator_analysis import *
 5. Dokumenteer in dit bestand
 
 ---
-
-**Laatste update**: 13 februari 2026
