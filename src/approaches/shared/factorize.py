@@ -222,9 +222,63 @@ def apply_factorization(G: nx.MultiDiGraph,
 # OPSLAAN
 # ---------------------------------------------------------------------------
 
+# def save_dot(G: nx.MultiDiGraph, filename: str):
+#     try:
+#         nx.drawing.nx_pydot.write_dot(G, filename)
+#         print(f"Gefactoriseerde graaf opgeslagen: {filename}")
+#     except Exception as e:
+#         print(f"Fout bij opslaan: {e}")
+
 def save_dot(G: nx.MultiDiGraph, filename: str):
+    # 1. Maak een tijdelijke DiGraph voor de export
+    export_G = nx.DiGraph()
+
+    # Neem globale graaf-attributen over (zoals name="bigSmall")
+    export_G.graph.update(G.graph)
+
+    # 2. Kopieer nodes en maak dicts veilig voor DOT
+    for node, data in G.nodes(data=True):
+        clean_attrs = {}
+        for k, v in data.items():
+            if isinstance(v, dict):
+                clean_attrs[k] = str(v)
+            elif v is not None:
+                clean_attrs[k] = str(v).strip('"')
+        export_G.add_node(node, **clean_attrs)
+
+    # 3. Verzamel ALLE unieke edges en hun attributen
+    all_unique_edges = set()
+    edge_groups = defaultdict(list)
+    edge_metadata = {}
+
+    for u, v, data in G.edges(data=True):
+        all_unique_edges.add((u, v))
+        
+        # Verzamel labels als ze bestaan
+        if 'label' in data:
+            edge_groups[(u, v)].append(str(data['label']).strip('"'))
+        
+        # Bewaar overige metadata (van de eerste edge die we zien)
+        if (u, v) not in edge_metadata:
+            edge_metadata[(u, v)] = {k: val for k, val in data.items() if k != 'label'}
+
+    # 4. Voeg alle edges toe aan de nieuwe graaf
+    for u, v in all_unique_edges:
+        labels = edge_groups.get((u, v), [])
+        meta = edge_metadata.get((u, v), {})
+        
+        if labels:
+            # Combineer labels met een komma
+            combined_label = ",".join(sorted(set(labels)))
+            export_G.add_edge(u, v, label=combined_label, **meta)
+        else:
+            # Voeg edge toe zonder label (zoals __start0 -> q0)
+            export_G.add_edge(u, v, **meta)
+
+    # 5. Opslaan via pydot
     try:
-        nx.drawing.nx_pydot.write_dot(G, filename)
-        print(f"Gefactoriseerde graaf opgeslagen: {filename}")
+        pd_graph = nx.drawing.nx_pydot.to_pydot(export_G)
+        pd_graph.write_raw(filename)
+        print(f"Gefactoriseerde graaf succesvol opgeslagen: {filename}")
     except Exception as e:
         print(f"Fout bij opslaan: {e}")
