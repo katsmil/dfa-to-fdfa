@@ -109,6 +109,43 @@ def _replace_instance_with_rc(G: nx.MultiDiGraph,
     _process_exits(G, loc, instance_mapping, rc_id)
 
 
+def _update_dispatch_maps(G: nx.MultiDiGraph,
+                           replaced_by: Dict[str, str],
+                           rc_nodes_with_dispatch: Set[str]):
+    """
+    Werkt dispatch_maps bij van bekende RC nodes.
+    """
+    for node in rc_nodes_with_dispatch:
+        data = G.nodes[node]
+        if 'dispatch_map' not in data:
+            continue
+
+        dispatch_map = data['dispatch_map']
+        updated = False
+
+        for label, sub_to_target in dispatch_map.items():
+            for sub_node, target in list(sub_to_target.items()):
+                if target in replaced_by:
+                    new_target = replaced_by[target]
+                    sub_to_target[sub_node] = new_target
+                    updated = True
+
+                    if G.has_edge(node, target, key=label):
+                        G.remove_edge(node, target, key=label)
+                    if not G.has_edge(node, new_target, key=label):
+                        G.add_edge(node, new_target, label=label, key=label)
+
+        if updated:
+            visual_rows = [
+                f'"{l}": {", ".join(nodes.keys())}'
+                for l, nodes in dispatch_map.items()
+            ]
+            mapping_str = "\\n".join(visual_rows)
+            base_label = data['label'].split("\\n[")[0]
+            if mapping_str:
+                G.nodes[node]['label'] = f"{base_label}\\n[{mapping_str}]"
+
+
 # ---------------------------------------------------------------------------
 # VALIDATIE
 # ---------------------------------------------------------------------------
@@ -181,19 +218,11 @@ def _filter_soft(G: nx.MultiDiGraph,
 def apply_factorization(G: nx.MultiDiGraph,
                          results: List[CanonicalSubstructure],
                          strict_filter: bool = True) -> nx.MultiDiGraph:
-    """
-    Past factorisatie toe op alle kandidaat-structuren.
-
-    strict_filter=True  (EquivalenceClosure):    harde filter, hele groep
-                                                 afwijzen bij eerste ongeldige locatie.
-    strict_filter=False (NoEquivalenceClosure):  zachte filter, ongeldige locaties
-                                                 overslaan en rest committen.
-    """
     processed_nodes: Set[str] = set()
     nodes_to_remove: Set[str] = set()
+    replaced_by: Dict[str, str] = {}
+    rc_nodes_with_dispatch: Set[str] = set()
     _filter = _filter_strict if strict_filter else _filter_soft
-
-    print(f"Start factorisatie met {len(results)} kandidaat-structuren...")
 
     for sub_id, sub in enumerate(results):
         sub_name = f"subroutine_{sub_id}"
@@ -206,17 +235,20 @@ def apply_factorization(G: nx.MultiDiGraph,
             _create_subroutine_structure(G, sub, sub_id)
 
             for loc, instance_mapping in valid_locations:
+                rc_id = f"RC_{loc.start_node}"
                 _replace_instance_with_rc(G, loc, sub_name, instance_mapping)
+                rc_nodes_with_dispatch.add(rc_id)
+
+                for original_node in loc.all_nodes:
+                    replaced_by[original_node] = rc_id
+
                 nodes_to_remove.update(loc.all_nodes)
                 processed_nodes.update(loc.all_nodes)
 
-            print(f"Succes: {sub_name} gefactoriseerd op {len(valid_locations)} locaties.")
-        elif not is_group_valid:
-            print(f"Overgeslagen: {sub_name} bevat ongeldige of overlappende locaties.")
-
     G.remove_nodes_from(nodes_to_remove)
-    return G
+    _update_dispatch_maps(G, replaced_by, rc_nodes_with_dispatch)
 
+    return G
 
 # ---------------------------------------------------------------------------
 # OPSLAAN
