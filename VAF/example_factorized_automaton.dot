@@ -1,52 +1,49 @@
 digraph G {
-  rankdir=LR;
-  node [fontname="Arial", style=filled]; // Standaard stijl voor alle knopen
-
-  __start0 [label="" shape=none width=0 height=0];
-  __start1 [label="" shape=none width=0 height=0];
-  __start2 [label="" shape=none width=0 height=0];
-  __start3 [label="" shape=none width=0 height=0];
-  
-  __start0 -> A;
-  
-  
-  A [fillcolor=lightgreen];
-  F [shape=doublecircle, fillcolor=lightpink];
-
-  // --- REGIO ALPHA (Grijze tint) ---
-  node [fillcolor="#eeeeee"]; 
-  sub_a_B1 [label="B1"]; sub_a_C1 [label="C1"]; sub_a_D1 [shape=doublecircle; label="D1"];
-
-  sub_a_B1 -> sub_a_C1 [label="v"];
-  sub_a_C1 -> sub_a_D1 [label="z"];
-  sub_a_D1 -> sub_a_B1 [label="u"];
-  sub_a_B1 -> sub_a_B1 [label="ε"];
-  __start3 -> sub_a_B1;
-  
-  RC_1 [shape=box, style=filled, fillcolor=orange, label="RC Sub_1"];
-  RC_11 [shape=box, style=filled, fillcolor=orange, label="RC Sub_11"];
-  RC_B1 [shape=box, style=filled, fillcolor=orange, label="RC Sub_B1"];
-  RC_M1 [shape=box, style=filled, fillcolor=orange, label="RC Sub_K1"];
-  
-  // ---REGIO ACYCLISCH ---
-  node [fillcolor="#FFFF00"];
-  1; 2; 3; 4[shape=doublecircle];
-  1 -> 2 [label="u"];
-  2 -> 3 [label="v"];
-  3 -> 4 [label="w"];
-  __start1 -> 1;
-  
-  // --- Verbindingen ---
-  node [fillcolor=white]; // Reset kleur voor rest
-  A -> RC_B1 [label="c"];
-  A -> RC_1 [label="x"];
-  A -> RC_11 [label="y"];
-  
-  RC_M1 -> F [label="i"];
-  RC_B1 -> RC_M1 [label="transit"];
-  RC_1 -> F [label="g"];
-  RC_11  -> F [label="z"];
-  
-  A  -> A  [label="stay"];
-  F  -> F  [label="halt"];
+    rankdir = LR;
+    node [fontname = "Arial"; style = filled;];
+    __start0 [label = "";shape = none;width = 0;height = 0;];
+    __start1 [label = "";shape = none;width = 0;height = 0;];
+    __start2 [label = "";shape = none;width = 0;height = 0;];
+    __start3 [label = "";shape = none;width = 0;height = 0;];
+    __start0 -> A;
+    A [fillcolor = lightgreen;ordering = out;];
+    F [shape = doublecircle;fillcolor = lightpink;];
+    
+    // --- REGIO ALPHA (Grijze tint) ---
+    node [fillcolor = "#eeeeee";];
+    sub_a_B1 [label = "B1";];
+    sub_a_C1 [label = "C1";];
+    sub_a_D1 [shape = doublecircle;label = "D1";];
+    sub_a_B1 -> sub_a_C1 [label = "v";];
+    sub_a_C1 -> sub_a_D1 [label = "z";];
+    sub_a_D1 -> sub_a_B1 [label = "u";];
+    sub_a_B1 -> sub_a_B1 [label = "a";];
+    __start3 -> sub_a_B1;
+    RC_1 [shape = box;style = filled;fillcolor = orange;label = "RC Sub_1";];
+    RC_11 [shape = box;style = filled;fillcolor = orange;label = "RC Sub_11";];
+    RC_B1 [shape = box;style = filled;fillcolor = orange;label = "RC Sub_B1";];
+    RC_M1 [shape = box;style = filled;fillcolor = orange;label = "RC Sub_K1";];
+    
+    // ---REGIO ACYCLISCH ---
+    node [fillcolor = "#FFFF00";];
+    1;
+    2;
+    3;
+    4 [shape = doublecircle;];
+    1 -> 2 [label = "u";];
+    2 -> 3 [label = "v";];
+    3 -> 4 [label = "w";];
+    __start1 -> 1;
+    
+    // --- Verbindingen ---
+    node [fillcolor = white;];
+    A -> RC_B1 [label = "c";];
+    RC_B1 -> RC_M1 [label = "transit";];
+    RC_M1 -> F [label = "i";];
+    A -> RC_1 [label = "x";];
+    A -> RC_11 [label = "y";];
+    RC_1 -> F [label = "g";];
+    RC_11 -> F [label = "z";];
+    A -> A [label = "stay";];
+    F -> F [label = "halt";];
 }
