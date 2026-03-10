@@ -67,8 +67,9 @@ class BaseSubstructureAnalyzer:
             if n1 == n2:
                 continue
             if n1 in nodes_in_b or n2 in nodes_in_a:
-                # return None -- overlap van structuren die zich op hetzelfde pad bevinden
-                continue
+                # return None -- overlap van structuren die zich op hetzelfde pad bevinden; ook indirecte overlap niet toestaan
+                # continue -- directe overlap afwijzen, indirecte overlap toestaan
+                return None
             if self._get_node_signature(n1) != self._get_node_signature(n2):
                 continue
 
