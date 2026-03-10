@@ -198,14 +198,31 @@ class DFAExecutor:
         
         return current
     
-    def _take_transition(self, node: str, symbol: str) -> Optional[str]:
-        """Vind de target node voor een transitie met gegeven label, en volg epsilon-transities"""
-        for _, target, data in self.G.out_edges(node, data=True):
-            if data.get('label') == symbol:
-                # Volg epsilon-transities van target totdat we een node met labeled outgoing vinden
-                return self._follow_epsilon_transitions(target)
-        return None
+    # def _take_transition(self, node: str, symbol: str) -> Optional[str]:
+    #     """Vind de target node voor een transitie met gegeven label, en volg epsilon-transities"""
+    #     for _, target, data in self.G.out_edges(node, data=True):
+    #         if data.get('label') == symbol:
+    #             # Volg epsilon-transities van target totdat we een node met labeled outgoing vinden
+    #             return self._follow_epsilon_transitions(target)
+    #     return None
     
+    def _take_transition(self, node: str, symbol: str) -> Optional[str]:
+        """Vind de target node voor een transitie met gegeven label"""
+        
+        for _, target, data in self.G.out_edges(node, data=True):
+            label = data.get('label')
+
+            if label is None:
+                continue
+
+            # label kan 'a' of 'a,b,c'
+            symbols = [s.strip() for s in label.split(',')]
+
+            if symbol in symbols:
+                return self._follow_epsilon_transitions(target)
+
+        return None
+
     # DIT IS DE MOOIERE OPLOSSING DENK IK::
     # def _get_subroutine_entry(self, rc_node: str) -> Optional[str]:
     #     """
