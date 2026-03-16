@@ -87,18 +87,97 @@
             "console": "integratedTerminal",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
-            },
+            }
         },
         {
-            "name": "🧪 Language Preservation Tester",
+            "name": "🧪 Language Preservation - Single String",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/language_preservation/language_preservation.py",
+            "program": "${workspaceFolder}/src/language_preservation/random_language_preservation.py",
             "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
             "args": [
                 "${input:lp_orig}",
                 "${input:lp_fact}",
                 "${input:lp_string}"
+            ]
+        },
+        {
+            "name": "🧪 Language Preservation - Random",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/language_preservation/random_language_preservation.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [
+                "${input:lp_orig}",
+                "${input:lp_fact}"
+            ]
+        },
+        {
+            "name": "🧪 Language Preservation - Targeted",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/language_preservation/targeted_language_preservation.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [
+                "${input:lp_orig}",
+                "${input:lp_fact}"
+            ]
+        },
+        {
+            "name": "🧪 Language Preservation - Targeted (verbose)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/language_preservation/targeted_language_preservation.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [
+                "${input:lp_orig}",
+                "${input:lp_fact}",
+                "--verbose"
+            ]
+        },
+        {
+            "name": "🧪 Language Preservation - Targeted (subset)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/language_preservation/targeted_language_preservation.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [
+                "${input:lp_orig}",
+                "${input:lp_fact}",
+                "--states",
+                "${input:lp_states}"
+            ]
+        },
+        {
+            "name": "🧪 Language Preservation - Targeted (subset + verbose)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/language_preservation/targeted_language_preservation.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [
+                "${input:lp_orig}",
+                "${input:lp_fact}",
+                "--states",
+                "${input:lp_states}",
+                "--verbose"
             ]
         }
     ],
@@ -132,6 +211,12 @@
             "type": "promptString",
             "description": "Input string (bijv. axxa or 'a x x a' for spaced tokens)",
             "default": "axxa"
+        },
+        {
+            "id": "lp_states",
+            "type": "promptString",
+            "description": "Comma-separated state names to test (e.g. q0,q3,q7)",
+            "default": "q0,q1"
         }
     ]
 }

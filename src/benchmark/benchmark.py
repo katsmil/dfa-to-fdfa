@@ -200,7 +200,7 @@ class BenchmarkSuite:
         Gebruik random walk testing (zie implementatie hieronder).
         """
         try:
-            from language_preservation.language_preservation import verify_language_preservation as lp_verify
+            from src.language_preservation.random_language_preservation import verify_language_preservation as lp_verify
         except Exception as e:
             print(f"⚠️  Warning: could not import language_preservation helper: {e}")
             return True, []
