@@ -1,0 +1,27 @@
+digraph "fourComponents" {
+qf [shape=doublecircle];
+__start0;
+q0;
+af;
+SUB_0_0 [cluster="subroutine_0", label=S0];
+SUB_0_1 [cluster="subroutine_0", label=S1];
+SUB_0_2 [cluster="subroutine_0", label=S2];
+SUB_0_3 [cluster="subroutine_0", label=S3];
+SUB_0_4 [cluster="subroutine_0", label=S4];
+SUB_0_5 [cluster="subroutine_0", label=S5, peripheries=2, fillcolor=lightblue, style=filled];
+__start_subroutine_0 [label="", shape=none, width=0, height=0, cluster="subroutine_0"];
+RC_a1 [shape=box, style=filled, fillcolor=orange, label="RC: subroutine_0\n[\"\"3\"\": SUB_0_5]", dispatch_map="{'\"3\"': {'SUB_0_5': 'af'}}"];
+RC_b1 [shape=box, style=filled, fillcolor=orange, label="RC: subroutine_0\n[\"\"3\"\": SUB_0_5]", dispatch_map="{'\"3\"': {'SUB_0_5': 'qf'}}"];
+__start0 -> q0 [key=0];
+q0 -> RC_a1 [key=0, label="a"];
+q0 -> RC_b1 [key=0, label="b"];
+af -> qf [key=0, label="a"];
+SUB_0_0 -> SUB_0_1 [key=0, label="1"];
+SUB_0_1 -> SUB_0_2 [key=0, label="2"];
+SUB_0_2 -> SUB_0_3 [key=0, label="3"];
+SUB_0_3 -> SUB_0_4 [key=0, label="1"];
+SUB_0_4 -> SUB_0_5 [key=0, label="2"];
+__start_subroutine_0 -> SUB_0_0 [key=0];
+RC_a1 -> af [key="3", label="3"];
+RC_b1 -> qf [key="3", label="3"];
+}

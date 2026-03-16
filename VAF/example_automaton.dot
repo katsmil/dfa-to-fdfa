@@ -1,55 +1,67 @@
 digraph G {
-  rankdir=LR;
-  node [fontname="Arial", style=filled]; // Standaard stijl voor alle knopen
-
-  __start0 [label="" shape=none width=0 height=0];
-  __start0 -> A;
-  A [fillcolor=lightgreen];
-  F [shape=doublecircle, fillcolor=lightpink];
-
-  // --- REGIO ALPHA (Grijze tint) ---
-  node [fillcolor="#eeeeee"]; 
-  a_B1 [label="B1"]; a_C1 [label="C1"]; a_D1 [label="D1"];
-
-  a_B1 -> a_C1 [label="v"];
-  a_C1 -> a_D1 [label="z"];
-  a_D1 -> a_B1 [label="u"];
-  
-  a_B1 -> a_B1 [label="ε"];
-
-  // --- REGIO BETA (Blauwe tint) ---
-  node [fillcolor="#e1f5fe"];
-  b_K1 [label="K1"]; b_L1 [label="L1"]; b_M1 [label="M1"];
-
-  b_K1 -> b_L1 [label="v"];
-  b_L1 -> b_M1 [label="z"];
-  b_M1 -> b_K1 [label="u"];
- 
-  b_K1 -> b_K1 [label="ε"];
-  
-  // ---REGIO ACYCLISCH ---
-  node [fillcolor="#FFFF00"];
-  1; 2; 3; 4;
-  11;12;13;14
-  1 -> 2 [label="u"];
-  2 -> 3 [label="v"];
-  3 -> 4 [label="w"];
-  
-  11 -> 12 [label="u"];
-  12 -> 13 [label="v"];
-  13 -> 14 [label="w"];
-
-  // --- Verbindingen ---
-  node [fillcolor=white]; // Reset kleur voor rest
-  A -> a_B1 [label="c"];
-  A -> 1 [label="x"];
-  A -> 11 [label="y"];
-  a_D1 -> b_K1 [label="transit"];
-  b_M1 -> F [label="i"];
- 
-  14 -> F [label="z"];
-  4 -> F [label="g"];
-  
-  A  -> A  [label="stay"];
-  F  -> F  [label="halt"];
+    rankdir = LR
+    node [fontname = "Arial" style = filled]
+    // Standaard stijl voor alle knopen
+    
+    __start0 [label = "" shape = none width = 0 height = 0]
+    __start0 -> A
+    A [fillcolor = lightgreen]
+    F [shape = doublecircle fillcolor = lightpink]
+    
+    // --- REGIO ALPHA (Grijze tint) ---
+    node [fillcolor = "#eeeeee"]
+    a_B1 [label = "B1"]
+    a_C1 [label = "C1"]
+    a_D1 [label = "D1"]
+    
+    a_B1 -> a_C1 [label = "v"]
+    a_C1 -> a_D1 [label = "z"]
+    a_D1 -> a_B1 [label = "u"]
+    
+    a_B1 -> a_B1 [label = "a"]
+    
+    // --- REGIO BETA (Blauwe tint) ---
+    node [fillcolor = "#e1f5fe"]
+    b_K1 [label = "K1"]
+    b_L1 [label = "L1"]
+    b_M1 [label = "M1"]
+    
+    b_K1 -> b_L1 [label = "v"]
+    b_L1 -> b_M1 [label = "z"]
+    b_M1 -> b_K1 [label = "u"]
+    
+    b_K1 -> b_K1 [label = "a"]
+    
+    // ---REGIO ACYCLISCH ---
+    node [fillcolor = "#FFFF00"]
+    1
+    2
+    3
+    4
+    11
+    12
+    13
+    14
+    1 -> 2 [label = "u"]
+    2 -> 3 [label = "v"]
+    3 -> 4 [label = "w"]
+    
+    11 -> 12 [label = "u"]
+    12 -> 13 [label = "v"]
+    13 -> 14 [label = "w"]
+    
+    // --- Verbindingen ---
+    node [fillcolor = white]
+    // Reset kleur voor rest
+    A -> a_B1 [label = "c"]
+    A -> 1 [label = "x"]
+    A -> 11 [label = "y"]
+    a_D1 -> b_K1 [label = "transit"]
+    b_M1 -> F [label = "i"]
+    
+    14 -> F [label = "z"]
+    4 -> F [label = "g"]
+    
+    A -> A [label = "stay"]
+    F -> F [label = "halt"]
 }

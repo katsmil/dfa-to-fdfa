@@ -1,0 +1,28 @@
+digraph "commonState" {
+qf [shape=doublecircle];
+__start0;
+q0;
+xx;
+af;
+bf;
+SUB_a1_a2 [cluster="subroutine_a1_0", label=a2, peripheries=2, status=accepting, fillcolor=lightblue, style=filled];
+SUB_a1_a1 [cluster="subroutine_a1_0", label=a1, peripheries=2, status=accepting, fillcolor=lightblue, style=filled];
+SUB_a1_a3 [cluster="subroutine_a1_0", label=a3, peripheries=2, status=accepting, fillcolor=lightblue, style=filled];
+__start_subroutine_a1_0 [label="", shape=none, width=0, height=0, cluster="subroutine_a1_0"];
+RC_a1 [shape=box, style=filled, fillcolor=orange, label="RC: Sub_a1\n[\"\"0\"\": SUB_a1_a1, SUB_a1_a2, SUB_a1_a3\n\"\"3\"\": SUB_a1_a3]", dispatch_map="{'\"0\"': {'SUB_a1_a2': 'xx', 'SUB_a1_a1': 'xx', 'SUB_a1_a3': 'xx'}, '\"3\"': {'SUB_a1_a3': 'af'}}"];
+RC_b1 [shape=box, style=filled, fillcolor=orange, label="RC: Sub_a1\n[\"\"0\"\": SUB_a1_a1, SUB_a1_a2, SUB_a1_a3\n\"\"3\"\": SUB_a1_a3]", dispatch_map="{'\"0\"': {'SUB_a1_a1': 'xx', 'SUB_a1_a3': 'xx', 'SUB_a1_a2': 'xx'}, '\"3\"': {'SUB_a1_a3': 'bf'}}"];
+qf -> q0 [key=0, label="r"];
+__start0 -> q0 [key=0];
+q0 -> RC_a1 [key=0, label="a"];
+q0 -> RC_b1 [key=0, label="b"];
+xx -> q0 [key=0, label="r"];
+af -> qf [key=0, label="a"];
+bf -> qf [key=0, label="b"];
+SUB_a1_a2 -> SUB_a1_a3 [key=0, label="2"];
+SUB_a1_a1 -> SUB_a1_a2 [key=0, label="1"];
+__start_subroutine_a1_0 -> SUB_a1_a1 [key=0];
+RC_a1 -> xx [key="0", label="0"];
+RC_a1 -> af [key="3", label="3"];
+RC_b1 -> xx [key="0", label="0"];
+RC_b1 -> bf [key="3", label="3"];
+}

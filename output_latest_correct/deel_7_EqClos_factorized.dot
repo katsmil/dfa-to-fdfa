@@ -1,0 +1,96 @@
+digraph "G" {
+label=<
+    <b>Toelichting:</b><br/>
+    Deze cyclische minimale DFA toont drie cyclische substructuren die herhalend zijn<br/>
+    te weten: (b1,c1,d1), (k1,l1,m1) en (r1,s1,t1).<br/>
+    Daarnaast bestaat er een acyclische staart in deze automaat, welke is aangegeven in geel.<br/>
+    Hiervoor geldt dat de structuur overeenkomt tussen de verzameling toestanden:<br/>
+    (1,2,3,4) en (11,12,13,14)
+    
+  >;
+labelloc="t";
+fontsize=30;
+rankdir=LR;
+node [fontname="Arial", style=filled];
+__start0 [label="", shape=none, width=0, height=0];
+A [fillcolor=lightgreen];
+F [shape=doublecircle, fillcolor=lightpink];
+a_B1 [label="B1"];
+a_C1 [label="C1"];
+a_D1 [label="D1"];
+a_B2 [label="B2"];
+a_C2 [label="C2"];
+a_D2 [label="D2"];
+a_C1a [label="C1a"];
+b_K1 [label="K1"];
+b_L1 [label="L1"];
+b_M1 [label="M1"];
+b_K2 [label="K2"];
+b_L2 [label="L2"];
+b_M2 [label="M2"];
+b_L1a [label="L1a"];
+c_R1 [label="R1"];
+c_S1 [label="S1"];
+c_T1 [label="T1"];
+c_S1a [label="S1a"];
+5;
+15;
+SUB_1_4 [cluster="subroutine_1_0", label=4, peripheries=2, status=accepting, fillcolor=lightblue, style=filled];
+SUB_1_3 [cluster="subroutine_1_0", label=3];
+SUB_1_2 [cluster="subroutine_1_0", label=2];
+SUB_1_1 [cluster="subroutine_1_0", label=1];
+__start_subroutine_1_0 [label="", shape=none, width=0, height=0, cluster="subroutine_1_0"];
+RC_1 [shape=box, style=filled, fillcolor=orange, label="RC: Sub_1\n[\"\"$\"\": SUB_1_4]", dispatch_map="{'\"$\"': {'SUB_1_4': '5'}}"];
+RC_11 [shape=box, style=filled, fillcolor=orange, label="RC: Sub_1\n[\"\"$\"\": SUB_1_4]", dispatch_map="{'\"$\"': {'SUB_1_4': '15'}}"];
+__start0 -> A [key=0];
+A -> a_B1 [key=0, label="entry_alpha"];
+A -> A [key=0, label="stay"];
+F -> F [key=0, label="halt"];
+a_B1 -> a_C1 [key=0, label="v"];
+a_B1 -> a_B1 [key=0, label="ε"];
+a_C1 -> a_D1 [key=0, label="z"];
+a_C1 -> a_C1a [key=0, label="g"];
+a_D1 -> a_B1 [key=0, label="u"];
+a_D1 -> a_B2 [key=0, label="cross"];
+a_D1 -> b_K1 [key=0, label="transit"];
+a_B2 -> a_C2 [key=0, label="v"];
+a_C2 -> a_D2 [key=0, label="z"];
+a_D2 -> a_B2 [key=0, label="u"];
+a_D2 -> a_B1 [key=0, label="back"];
+a_D2 -> F [key=0, label="exit_alpha"];
+a_D2 -> RC_1 [key=0, label="x"];
+a_C1a -> a_C1 [key=0, label="i"];
+b_K1 -> b_L1 [key=0, label="v"];
+b_K1 -> b_K1 [key=0, label="ε"];
+b_L1 -> b_M1 [key=0, label="z"];
+b_L1 -> b_L1a [key=0, label="g"];
+b_M1 -> b_K1 [key=0, label="u"];
+b_M1 -> b_L1a [key=0, label="$"];
+b_M1 -> b_K2 [key=0, label="cross"];
+b_K2 -> b_L2 [key=0, label="v"];
+b_L2 -> b_M2 [key=0, label="u"];
+b_L2 -> b_L2 [key=0, label="v"];
+b_M2 -> b_K2 [key=0, label="z"];
+b_M2 -> b_K1 [key=0, label="back"];
+b_M2 -> c_R1 [key=0, label="transit"];
+b_M2 -> F [key=0, label="exit_beta"];
+b_M2 -> RC_11 [key=0, label="y"];
+b_L1a -> b_L1 [key=0, label="h"];
+b_L1a -> b_K1 [key=0, label="$"];
+c_R1 -> c_R1 [key=0, label="ε"];
+c_R1 -> c_S1 [key=0, label="v"];
+c_S1 -> c_T1 [key=0, label="z"];
+c_S1 -> c_S1a [key=0, label="g"];
+c_T1 -> c_R1 [key=0, label="u"];
+c_T1 -> F [key=0, label="i"];
+c_S1a -> c_S1 [key=0, label="o"];
+5 -> F [key=0, label="g"];
+15 -> F [key=0, label="z"];
+SUB_1_4 -> SUB_1_2 [key=0, label="@"];
+SUB_1_3 -> SUB_1_4 [key=0, label="w"];
+SUB_1_2 -> SUB_1_3 [key=0, label="v"];
+SUB_1_1 -> SUB_1_2 [key=0, label="u"];
+__start_subroutine_1_0 -> SUB_1_1 [key=0];
+RC_1 -> 5 [key="$", label="$"];
+RC_11 -> 15 [key="$", label="$"];
+}

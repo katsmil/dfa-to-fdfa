@@ -1,0 +1,35 @@
+digraph g {
+	rankdir=LR;
+	graph [fontname="Helvetica" bgcolor="white"];
+	node [fontsize=12 fontname="Helvetica" margin="0.15,0.1"];
+	edge [fontsize=10 fontname="Helvetica" arrowsize=0.7];
+	splines=true;
+	nodesep=0.8;
+	ranksep=1.2;
+	{ rank=min; s337; }
+	{ rank=same; s90; s399; s401; }
+	{ rank=same; s92; }
+	{ rank=same; s106; }
+	{ rank=same; s119; }
+	{ rank=same; s134; }
+	{ rank=max; s154; }
+	s90 [shape="circle"];
+	s92 [shape="circle"];
+	s106 [shape="circle"];
+	s119 [shape="circle"];
+	s134 [shape="circle"];
+	s154 [shape="circle"];
+	s337 [shape="circle"];
+	s399 [shape="circle"];
+	s401 [shape="circle"];
+	s90 -> s399 [label="[0-9a-f]" penwidth=1.5];
+	s90 -> s92 [label=":"];
+	s92 -> s106 [label="[0-9a-f]" penwidth=1.5];
+	s106 -> s119 [label="[0-9a-f]" penwidth=1.5];
+	s119 -> s134 [label="[0-9a-f]" penwidth=1.5];
+	s134 -> s154 [label="[0-9a-f]" penwidth=1.5];
+	s337 -> s90 [label="[0-9a-f]" penwidth=1.5];
+	s399 -> s401 [label="[0-9a-f]" penwidth=1.5];
+	s399 -> s92 [label=":"];
+	s401 -> s92 [label=":"];
+}
