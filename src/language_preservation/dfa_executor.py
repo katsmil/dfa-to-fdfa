@@ -437,14 +437,24 @@ class DFAExecutor:
 
             if next_node is None:
                 if stack and self._is_frontier(current):
-                    rc_node = stack[-1]
-                    next_node = self._dispatch(rc_node, current, symbol)
+                    # Pop through transparent RC frames (empty dispatch_map) until
+                    # a frame can dispatch, or the stack is exhausted.
+                    # An RC node with an empty dispatch is a "tail-call" node:
+                    # the called subroutine absorbed all continuation routing,
+                    # so the return propagates directly to the outer caller.
+                    dispatched = False
+                    while stack:
+                        rc_node = stack.pop()
+                        next_node = self._dispatch(rc_node, current, symbol)
+                        if next_node is not None:
+                            trace.append(f"  RETURN via δret({rc_node}, {current}, '{symbol}') → {next_node}")
+                            dispatched = True
+                            break
+                        else:
+                            trace.append(f"  (transparent return through {rc_node})")
 
-                    if next_node is not None:
-                        stack.pop()
-                        trace.append(f"  RETURN via δret({rc_node}, {current}, '{symbol}') → {next_node}")
-                    else:
-                        trace.append(f"  REJECT: δret({rc_node}, {current}, '{symbol}') undefined")
+                    if not dispatched:
+                        trace.append(f"  REJECT: δret(..., {current}, '{symbol}') undefined on all stack frames")
                         return False, "\n".join(trace)
                 else:
                     trace.append(f"  REJECT: δint({current}, '{symbol}') undefined, no return possible")
@@ -453,16 +463,17 @@ class DFAExecutor:
             current = next_node
             trace.append(f"  '{symbol}' → {current}")
 
-        # If input ends on an RC node, follow the epsilon call into the subroutine.
-        # The subroutine entry (SUB_x_0) may have originally_accepting=True,
-        # which would make the string accepted — consistent with the FDFA semantics
-        # where entering an RC node is an epsilon transition.
-        if 'RC' in str(current):
+        # If input ends on an RC node, follow epsilon CALLs into subroutines.
+        # This may chain: RC_outer → SUB_x_0 → RC_inner → SUB_y_0 → ...
+        # We stop when the current node is no longer an RC node.
+        # Acceptance is decided by originally_accepting on the final node reached.
+        while 'RC' in str(current):
             subroutine_start = self._get_subroutine_entry(current)
-            if subroutine_start:
-                stack.append(current)
-                current = subroutine_start
-                trace.append(f"  CALL {current} (stack depth: {len(stack)}) [end-of-input]")
+            if not subroutine_start:
+                break
+            stack.append(current)
+            current = subroutine_start
+            trace.append(f"  CALL {current} (stack depth: {len(stack)}) [end-of-input]")
 
         current = self._follow_epsilon_to_accepting(current)
 
@@ -545,6 +556,14 @@ class DFAExecutor:
                     break
             if cluster_name:
                 break
+
+        # Fallback: parse cluster name from the RC node's label attribute.
+        # Used when dispatch_map is empty (suffix-case nested RC nodes created
+        # during second-run factorization have no exits of their own).
+        if cluster_name is None:
+            label = str(nd.get('label', '')).strip().strip('"').strip("'")
+            if label.startswith('RC:'):
+                cluster_name = label[3:].strip()
 
         if cluster_name:
             start_dummy = f"__start_{cluster_name}"

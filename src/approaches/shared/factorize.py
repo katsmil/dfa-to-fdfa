@@ -1,6 +1,6 @@
 import networkx as nx
 from collections import defaultdict
-from typing import List, Set, Dict, Tuple
+from typing import List, Set, Dict, Tuple, Optional
 
 from approaches.shared.shared_types import MatchLocation, CanonicalSubstructure
 
@@ -53,10 +53,17 @@ def _create_subroutine_structure(G: nx.MultiDiGraph,
 def _is_accepting_node(G: nx.MultiDiGraph, node: str) -> bool:
     """
     Returns True if the node was an accepting state in G.
-    Strips surrounding quotes to handle both shape="doublecircle" and shape=doublecircle.
+    If the node was already tagged by a previous factorization run (via the
+    'originally_accepting' attribute), that value is used directly — this
+    prevents peripheries=2 frontier markers from being misread as accepting
+    states during the second run.
     """
-    shape = str(G.nodes[node].get('shape', '')).strip().strip('"').strip("'")
-    peripheries = str(G.nodes[node].get('peripheries', '')).strip().strip('"').strip("'")
+    nd = G.nodes[node]
+    oa = nd.get('originally_accepting')
+    if oa is not None:
+        return str(oa).strip().strip('"').strip("'").lower() == 'true'
+    shape = str(nd.get('shape', '')).strip().strip('"').strip("'")
+    peripheries = str(nd.get('peripheries', '')).strip().strip('"').strip("'")
     return shape == 'doublecircle' or peripheries == '2'
 
 
@@ -145,8 +152,13 @@ def _replace_instance_with_rc(G: nx.MultiDiGraph,
     rc_id = f"RC_{loc.start_node}"
 
     if not G.has_node(rc_id):
-        G.add_node(rc_id, shape='box', style='filled', fillcolor='orange',
-                   label=f"RC: {sub_name}")
+        rc_attrs = dict(shape='box', style='filled', fillcolor='orange',
+                        label=f"RC: {sub_name}")
+        # Erf cluster over van de vervangen startnode (nodig voor tweede-iteratie nesting)
+        start_cluster = G.nodes[loc.start_node].get('cluster')
+        if start_cluster:
+            rc_attrs['cluster'] = start_cluster
+        G.add_node(rc_id, **rc_attrs)
 
     instance_nodes = set(loc.all_nodes)
     for u, v, data in list(G.in_edges(loc.start_node, data=True)):
@@ -158,7 +170,8 @@ def _replace_instance_with_rc(G: nx.MultiDiGraph,
 
 def _update_dispatch_maps(G: nx.MultiDiGraph,
                            replaced_by: Dict[str, str],
-                           rc_nodes_with_dispatch: Set[str]):
+                           rc_nodes_with_dispatch: Set[str],
+                           frontier_key_replacements: Optional[Dict[str, str]] = None):
     """
     After all factorisation steps, some dispatch map targets may have been
     replaced by RC nodes. For example, if RC_s12 originally pointed to s42,
@@ -172,6 +185,12 @@ def _update_dispatch_maps(G: nx.MultiDiGraph,
       3. Adds a new edge to the RC node that replaced it, preserving the
          existing edge label exactly — no label modification is needed because
          the transition semantics (which symbol, which frontier) are unchanged.
+
+    Additionally, if frontier_key_replacements is provided (used in second-run
+    factorization of blueprint nodes), it updates dispatch_map KEYS across ALL
+    RC nodes. This is needed when frontier SUB blueprint nodes are removed and
+    replaced by nodes from a new inner subroutine: the callers of the outer
+    subroutine need their frontier-key references updated to the new SUB nodes.
     """
     for node in rc_nodes_with_dispatch:
         data = G.nodes[node]
@@ -205,6 +224,26 @@ def _update_dispatch_maps(G: nx.MultiDiGraph,
                             if not G.has_edge(node, new_target, key=k):
                                 G.add_edge(node, new_target,
                                            label=old_edge_label, key=k)
+
+    # Update dispatch_map KEYS for all RC nodes when blueprint frontier nodes were
+    # removed and replaced by nodes from a new inner subroutine (second-run case).
+    if frontier_key_replacements:
+        for node, node_data in G.nodes(data=True):
+            if 'dispatch_map' not in node_data:
+                continue
+            dm = node_data['dispatch_map']
+            if not isinstance(dm, dict):
+                continue
+            for label, sub_to_target in list(dm.items()):
+                keys_to_swap = [
+                    (old_k, frontier_key_replacements[old_k])
+                    for old_k in list(sub_to_target.keys())
+                    if old_k in frontier_key_replacements and old_k != frontier_key_replacements[old_k]
+                ]
+                for old_key, new_key in keys_to_swap:
+                    target = sub_to_target.pop(old_key)
+                    if new_key not in sub_to_target:
+                        sub_to_target[new_key] = target
 
 
 # ---------------------------------------------------------------------------
@@ -283,6 +322,7 @@ def apply_factorization(G: nx.MultiDiGraph,
     nodes_to_remove: Set[str] = set()
     replaced_by: Dict[str, str] = {}
     rc_nodes_with_dispatch: Set[str] = set()
+    frontier_key_replacements: Dict[str, str] = {}
     _filter = _filter_strict if strict_filter else _filter_soft
 
     for sub_id, sub in enumerate(results):
@@ -300,14 +340,34 @@ def apply_factorization(G: nx.MultiDiGraph,
                 _replace_instance_with_rc(G, loc, sub_name, instance_mapping)
                 rc_nodes_with_dispatch.add(rc_id)
 
+                # Track which concrete nodes map to which canonical SUB nodes.
+                # Used to update dispatch_map KEYS when frontier blueprint nodes
+                # are removed (needed for correct second-run factorization).
+                for loc_node, sub_node in instance_mapping.items():
+                    frontier_key_replacements[loc_node] = sub_node
+
                 for original_node in loc.all_nodes:
                     replaced_by[original_node] = rc_id
 
                 nodes_to_remove.update(loc.all_nodes)
                 processed_nodes.update(loc.all_nodes)
 
+    # Propagate peripheries=2 (frontier) marking to the new canonical SUB nodes
+    # if the concrete nodes they replace were frontier-marked. This ensures
+    # correct visualization and dispatch semantics after second-run factorization.
+    for old_node, new_sub_node in frontier_key_replacements.items():
+        if G.has_node(old_node) and G.has_node(new_sub_node):
+            old_peripheries = G.nodes[old_node].get('peripheries')
+            if old_peripheries == 2 or str(old_peripheries).strip('"') == '2':
+                G.nodes[new_sub_node].update({
+                    "peripheries": 2,
+                    "fillcolor": "lightblue",
+                    "style": "filled",
+                })
+
     G.remove_nodes_from(nodes_to_remove)
-    _update_dispatch_maps(G, replaced_by, rc_nodes_with_dispatch)
+    _update_dispatch_maps(G, replaced_by, rc_nodes_with_dispatch,
+                          frontier_key_replacements if frontier_key_replacements else None)
 
     return G
 
