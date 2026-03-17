@@ -16,11 +16,14 @@ Reuses DFAExecutor from dfa_executor.py for FDFA execution,
 including RC node and call stack support.
 """
 
+import json
 import networkx as nx
+from datetime import datetime
+from pathlib import Path
 from typing import List, Set, Tuple, Optional, Dict
 from collections import deque
 
-from dfa_executor import DFAExecutor
+from dfa_executor import DFAExecutor, find_start_node, find_accepting_nodes
 
 
 # ---------------------------------------------------------------------------
@@ -45,28 +48,6 @@ def _extract_labeled_transitions(G: nx.MultiDiGraph) -> Dict[str, Dict[str, str]
             if sym:
                 table[u][sym] = v
     return table
-
-
-def _find_start_node(G: nx.MultiDiGraph) -> str:
-    """Same logic as DFAExecutor._find_start_node."""
-    for node in G.nodes():
-        if G.in_degree(node) == 0:
-            return node
-        if G.nodes[node].get('start') == True:
-            return node
-    return list(G.nodes())[0]
-
-
-def _find_accepting_nodes(G: nx.MultiDiGraph) -> Set[str]:
-    """Same logic as DFAExecutor._find_accepting_nodes."""
-    accepting = set()
-    for node in G.nodes():
-        nd = G.nodes[node]
-        if nd.get('shape') == 'doublecircle':
-            accepting.add(node)
-        elif nd.get('peripheries') in (2, '2'):
-            accepting.add(node)
-    return accepting
 
 
 def _bfs_shortest_paths(G: nx.MultiDiGraph,
@@ -233,6 +214,20 @@ class TestCase:
             lines.append(f"\n  --- Factored trace ---\n{self.trace_fact}")
         return "\n".join(lines)
 
+    def to_dict(self) -> dict:
+        """Serialize this test case to a JSON-compatible dict."""
+        return {
+            "state":        self.state,
+            "suffix_kind":  self.suffix_kind,
+            "prefix":       self.prefix,
+            "suffix":       self.suffix,
+            "full_string":  self.full_string,
+            "original":     "ACCEPT" if self.expected else "REJECT",
+            "factored":     "ACCEPT" if self.accepted_fact else "REJECT",
+            "passed":       not self.is_mismatch,
+            "trace":        self.trace_fact,
+        }
+
 
 # ---------------------------------------------------------------------------
 # TargetedLanguagePreservationTester
@@ -250,8 +245,8 @@ class TargetedLanguagePreservationTester:
 
         # Build helper structures on the original DFA
         self._table = _extract_labeled_transitions(G_original)
-        self._start = _find_start_node(G_original)
-        self._accepting = _find_accepting_nodes(G_original)
+        self._start = find_start_node(G_original)
+        self._accepting = find_accepting_nodes(G_original)
         self._all_nodes = set(G_original.nodes())
 
         # Shortest paths from start to every reachable state
@@ -327,14 +322,17 @@ class TargetedLanguagePreservationTester:
         return all_match, all_cases
 
     def run_report(self, verbose: bool = False,
-                   states: Optional[Set[str]] = None) -> str:
+                   states: Optional[Set[str]] = None) -> Tuple[str, List[TestCase]]:
         """
-        Run all tests and return a human-readable report.
+        Run all tests and return a human-readable report together with all test cases.
 
         Args:
             verbose: if True, show the factored trace for passing tests as well;
                      traces for mismatches are always shown.
             states:  optional subset of states to test (tests all if None).
+
+        Returns:
+            (report: str, all_cases: List[TestCase])
         """
         num_states = len(self._prefixes)
         unreachable_orig = len(self._all_nodes) - num_states
@@ -364,7 +362,48 @@ class TargetedLanguagePreservationTester:
         else:
             report.append(f"\n❌ FAILURE: {len(mismatches)} mismatch(es) found!")
 
-        return "\n".join(report)
+        return "\n".join(report), all_cases
+
+    def write_json(self,
+                   orig_path: str,
+                   fact_path: str,
+                   all_cases: List[TestCase],
+                   output_path: str = "language_preservation_result.json") -> None:
+        """
+        Write already-computed test results to a JSON file, overwriting any
+        existing content. Defaults to language_preservation_result.json in
+        the working directory.
+
+        Args:
+            orig_path:  path to the original DOT file (stored as metadata)
+            fact_path:  path to the factored DOT file (stored as metadata)
+            all_cases:  test cases returned by run_report()
+            output_path: destination file path
+        """
+        num_states = len(self._prefixes)
+        unreachable_orig = len(self._all_nodes) - num_states
+        mismatches = [tc for tc in all_cases if tc.is_mismatch]
+        all_match = len(mismatches) == 0
+
+        result = {
+            "timestamp":  datetime.now().isoformat(timespec="seconds"),
+            "original":   orig_path,
+            "factored":   fact_path,
+            "summary": {
+                "states_analysed":    num_states,
+                "unreachable_states": unreachable_orig,
+                "tests_executed":     len(all_cases),
+                "mismatches":         len(mismatches),
+                "passed":             all_match,
+            },
+            "cases": [tc.to_dict() for tc in all_cases],
+        }
+
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(result, f, indent=2)
+
+        print(f"📄 Results written to {output_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -409,8 +448,9 @@ if __name__ == "__main__":
         G_factored = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(fact_path))
 
         tester = TargetedLanguagePreservationTester(G_original, G_factored)
-        report = tester.run_report(verbose=verbose, states=states)
+        report, all_cases = tester.run_report(verbose=verbose, states=states)
         print(report)
+        tester.write_json(orig_path, fact_path, all_cases)
 
     else:
         # Fallback for local testing
@@ -418,5 +458,5 @@ if __name__ == "__main__":
         G_factored = nx.nx_pydot.read_dot("output/deel_8_factorized.dot")
 
         tester = TargetedLanguagePreservationTester(G_original, G_factored)
-        report = tester.run_report()
+        report, _ = tester.run_report()
         print(report)

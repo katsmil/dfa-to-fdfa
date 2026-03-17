@@ -1,3 +1,316 @@
+# """
+# DFA EXECUTOR
+# ============
+
+# Shared execution engine for (factored) DFAs.
+# Supports both plain DFAs and DFAs with RC nodes and a call stack
+# (the result of the factorization algorithm).
+
+# Imported by:
+#   - language_preservation_random.py
+#   - targeted_language_preservation.py
+# """
+
+# import copy
+# import ast
+# import networkx as nx
+# from typing import List, Set, Tuple, Optional
+
+
+
+# # ---------------------------------------------------------------------------
+# # Module-level graph helpers (also used by targeted_language_preservation.py)
+# # ---------------------------------------------------------------------------
+
+# def find_start_node(G: nx.MultiDiGraph) -> str:
+#     """Find the start node of a DFA graph (in-degree 0, or has a 'start' attribute)."""
+#     for node in G.nodes():
+#         if G.in_degree(node) == 0:
+#             return node
+#         if G.nodes[node].get('start') == True:
+#             return node
+#     return list(G.nodes())[0]
+
+
+# def find_accepting_nodes(G: nx.MultiDiGraph) -> Set[str]:
+#     """Find accepting states in a DFA graph (doublecircle shape or peripheries=2)."""
+#     accepting = set()
+#     for node in G.nodes():
+#         nd = G.nodes[node]
+#         shape = str(nd.get('shape', '')).strip().strip('"').strip("'")
+#         peripheries = str(nd.get('peripheries', '')).strip().strip('"').strip("'")
+#         if shape == 'doublecircle':
+#             accepting.add(node)
+#         elif peripheries == '2':
+#             accepting.add(node)
+#     return accepting
+
+
+# class DFAExecutor:
+#     """
+#     Executes strings on a (factored) DFA.
+#     Supports both plain DFAs and DFAs with RC nodes and a call stack.
+#     """
+
+#     def __init__(self, G: nx.MultiDiGraph):
+#         self.G = self._normalize_labels(G)
+#         self.G = self._normalize_node_attributes(self.G)
+#         self.start_node = self._find_start_node()
+#         self.start_node = self._follow_epsilon_transitions(self.start_node)
+#         self.accepting_nodes = self._find_accepting_nodes()
+
+#     # ------------------------------------------------------------------
+#     # Initialization helpers
+#     # ------------------------------------------------------------------
+
+#     def _follow_epsilon_transitions(self, node: str) -> str:
+#         """Follow epsilon transitions (unlabeled edges) until a node with labeled outgoing edges is reached."""
+#         visited = set()
+#         current = node
+
+#         while current not in visited:
+#             visited.add(current)
+#             epsilon_target = None
+#             has_labeled = False
+
+#             for _, target, data in self.G.out_edges(current, data=True):
+#                 if 'label' not in data or data.get('label') is None:
+#                     epsilon_target = target
+#                 else:
+#                     has_labeled = True
+
+#             if has_labeled:
+#                 return current
+
+#             if epsilon_target and epsilon_target not in visited:
+#                 current = epsilon_target
+#             else:
+#                 break
+
+#         return current
+
+#     def _find_start_node(self) -> str:
+#         """Find the start node (in-degree 0, or has a 'start' attribute)."""
+#         return find_start_node(self.G)
+
+#     def _find_accepting_nodes(self) -> Set[str]:
+#         """Find accepting states (doublecircle shape or peripheries=2)."""
+#         return find_accepting_nodes(self.G)
+
+#     # ------------------------------------------------------------------
+#     # Execution
+#     # ------------------------------------------------------------------
+
+#     def execute(self, input_string: List[str]) -> Tuple[bool, str]:
+#         """
+#         Execute a string on the automaton.
+
+#         Returns:
+#             (accepted: bool, trace: str)
+#         """
+#         current = self.start_node
+#         stack = []
+#         trace = [f"Start: {current}"]
+
+#         for symbol in input_string:
+#             if 'RC' in current:
+#                 subroutine_start = self._get_subroutine_entry(current)
+#                 if subroutine_start:
+#                     stack.append(current)
+#                     current = subroutine_start
+#                     trace.append(f"  CALL {current} (stack depth: {len(stack)})")
+
+#             next_node = self._take_transition(current, symbol)
+
+#             if next_node is None:
+#                 if stack and self._is_frontier(current):
+#                     rc_node = stack[-1]
+#                     next_node = self._dispatch(rc_node, current, symbol)
+
+#                     if next_node is not None:
+#                         stack.pop()
+#                         trace.append(f"  RETURN via δret({rc_node}, {current}, '{symbol}') → {next_node}")
+#                     else:
+#                         trace.append(f"  REJECT: δret({rc_node}, {current}, '{symbol}') undefined")
+#                         return False, "\n".join(trace)
+#                 else:
+#                     trace.append(f"  REJECT: δint({current}, '{symbol}') undefined, no return possible")
+#                     return False, "\n".join(trace)
+
+#             current = next_node
+#             trace.append(f"  '{symbol}' → {current}")
+
+#         current = self._follow_epsilon_to_accepting(current)
+
+#         accepted = False
+#         if current in self.accepting_nodes:
+#             nd = self.G.nodes.get(current, {})
+#             cluster = nd.get('cluster')
+#             if isinstance(cluster, str) and 'subroutine' in cluster:
+#                 # Inside a subroutine: only accept if this node was originally
+#                 # an accepting state in the unfactored DFA.
+#                 originally = str(nd.get('originally_accepting', 'False')).strip().strip('"').strip("'")
+#                 if originally == 'True':
+#                     accepted = True
+#             else:
+#                 accepted = True
+#         trace.append(f"\nFinal: {current} ({'ACCEPT' if accepted else 'REJECT'})")
+
+#         return accepted, "\n".join(trace)
+
+#     # ------------------------------------------------------------------
+#     # Transition helpers
+#     # ------------------------------------------------------------------
+
+#     def _take_transition(self, node: str, symbol: str) -> Optional[str]:
+#         """Find the target node for a transition with the given label."""
+#         for _, target, data in self.G.out_edges(node, data=True):
+#             label = data.get('label')
+#             if label is None:
+#                 continue
+#             symbols = [s.strip() for s in label.split(',')]
+#             if symbol in symbols:
+#                 return self._follow_epsilon_transitions(target)
+#         return None
+
+#     def _dispatch(self, rc_node: str, frontier_node: str, symbol: str) -> Optional[str]:
+#         """δret(rc_node, frontier_node, symbol) → target."""
+#         nd = self.G.nodes.get(rc_node, {})
+#         dispatch_map = nd.get('dispatch_map', {})
+
+#         if isinstance(dispatch_map, str):
+#             try:
+#                 dispatch_map = ast.literal_eval(dispatch_map)
+#             except (ValueError, SyntaxError):
+#                 return None
+
+#         def strip_quotes(s: str) -> str:
+#             s = s.strip()
+#             while len(s) >= 2 and ((s[0] == '"' and s[-1] == '"') or (s[0] == "'" and s[-1] == "'")):
+#                 s = s[1:-1].strip()
+#             return s
+
+#         normalized_map = {strip_quotes(k): v for k, v in dispatch_map.items()}
+#         symbol_map = normalized_map.get(symbol, {})
+
+#         if isinstance(symbol_map, dict):
+#             return symbol_map.get(frontier_node)
+
+#         return None
+
+#     def _get_subroutine_entry(self, rc_node: str) -> Optional[str]:
+#         """Find the entry node of the subroutine associated with this RC node."""
+#         nd = self.G.nodes.get(rc_node, {})
+#         dispatch_map = nd.get('dispatch_map', {})
+#         if isinstance(dispatch_map, str):
+#             try:
+#                 dispatch_map = ast.literal_eval(dispatch_map)
+#             except (ValueError, SyntaxError):
+#                 dispatch_map = {}
+
+#         # Derive the cluster name from a frontier node in the dispatch map
+#         cluster_name = None
+#         for symbol_map in dispatch_map.values():
+#             if not isinstance(symbol_map, dict):
+#                 continue
+#             for frontier_node in symbol_map.keys():
+#                 fn_data = self.G.nodes.get(frontier_node, {})
+#                 c = fn_data.get('cluster')
+#                 if c:
+#                     cluster_name = c
+#                     break
+#             if cluster_name:
+#                 break
+
+#         if cluster_name:
+#             start_dummy = f"__start_{cluster_name}"
+#             if self.G.has_node(start_dummy):
+#                 for _, target in self.G.out_edges(start_dummy):
+#                     return self._follow_epsilon_transitions(target)
+
+#             # Fallback: find the node in the cluster whose only predecessors are dummy start nodes
+#             for node in self.G.nodes():
+#                 node_data = self.G.nodes[node]
+#                 if node_data.get('cluster') != cluster_name:
+#                     continue
+#                 predecessors = list(self.G.predecessors(node))
+#                 if predecessors and all('__start_' in str(p) for p in predecessors):
+#                     return node
+
+#         return None
+
+#     def _is_frontier(self, node: str) -> bool:
+#         """Check whether a node is a frontier (accepting state belonging to a subroutine)."""
+#         if node not in self.accepting_nodes:
+#             return False
+#         nd = self.G.nodes.get(node, {})
+#         cluster = nd.get('cluster')
+#         if isinstance(cluster, str) and 'subroutine' in cluster:
+#             return True
+#         if 'SUB_' in str(node):
+#             return True
+#         return False
+
+#     def _follow_epsilon_to_accepting(self, node: str) -> str:
+#         """Follow epsilon transitions until an accepting node is reached."""
+#         visited = set()
+#         current = node
+
+#         while current not in visited:
+#             visited.add(current)
+
+#             if current in self.accepting_nodes:
+#                 return current
+
+#             epsilon_target = None
+#             for _, target, data in self.G.out_edges(current, data=True):
+#                 if 'label' not in data or data.get('label') is None:
+#                     epsilon_target = target
+#                     break
+
+#             if epsilon_target and epsilon_target not in visited:
+#                 current = epsilon_target
+#             else:
+#                 break
+
+#         return current
+
+#     # ------------------------------------------------------------------
+#     # Normalization
+#     # ------------------------------------------------------------------
+
+#     def _normalize_labels(self, G: nx.MultiDiGraph) -> nx.MultiDiGraph:
+#         """Remove extra quotes and normalize whitespace in edge labels."""
+#         G_norm = copy.deepcopy(G)
+
+#         for u, v, key, data in G_norm.edges(keys=True, data=True):
+#             if 'label' in data:
+#                 label = data['label']
+#                 if not isinstance(label, str):
+#                     label = str(label)
+#                 if len(label) >= 2 and ((label[0] == '"' and label[-1] == '"') or
+#                                         (label[0] == "'" and label[-1] == "'")):
+#                     label = label[1:-1]
+#                 label = label.strip()
+#                 G_norm[u][v][key]['label'] = label
+
+#         return G_norm
+
+#     def _normalize_node_attributes(self, G: nx.MultiDiGraph) -> nx.MultiDiGraph:
+#         """Strip surrounding quotes from node attribute values (pydot artifact)."""
+#         G_norm = copy.deepcopy(G)
+
+#         for node in G_norm.nodes():
+#             nd = G_norm.nodes[node]
+#             for attr in list(nd.keys()):
+#                 val = nd[attr]
+#                 if isinstance(val, str):
+#                     if len(val) >= 2 and ((val[0] == '"' and val[-1] == '"') or
+#                                           (val[0] == "'" and val[-1] == "'")):
+#                         nd[attr] = val[1:-1]
+
+#         return G_norm
+
 """
 DFA EXECUTOR
 ============
@@ -15,6 +328,35 @@ import copy
 import ast
 import networkx as nx
 from typing import List, Set, Tuple, Optional
+
+
+
+# ---------------------------------------------------------------------------
+# Module-level graph helpers (also used by targeted_language_preservation.py)
+# ---------------------------------------------------------------------------
+
+def find_start_node(G: nx.MultiDiGraph) -> str:
+    """Find the start node of a DFA graph (in-degree 0, or has a 'start' attribute)."""
+    for node in G.nodes():
+        if G.in_degree(node) == 0:
+            return node
+        if G.nodes[node].get('start') == True:
+            return node
+    return list(G.nodes())[0]
+
+
+def find_accepting_nodes(G: nx.MultiDiGraph) -> Set[str]:
+    """Find accepting states in a DFA graph (doublecircle shape or peripheries=2)."""
+    accepting = set()
+    for node in G.nodes():
+        nd = G.nodes[node]
+        shape = str(nd.get('shape', '')).strip().strip('"').strip("'")
+        peripheries = str(nd.get('peripheries', '')).strip().strip('"').strip("'")
+        if shape == 'doublecircle':
+            accepting.add(node)
+        elif peripheries == '2':
+            accepting.add(node)
+    return accepting
 
 
 class DFAExecutor:
@@ -62,23 +404,11 @@ class DFAExecutor:
 
     def _find_start_node(self) -> str:
         """Find the start node (in-degree 0, or has a 'start' attribute)."""
-        for node in self.G.nodes():
-            if self.G.in_degree(node) == 0:
-                return node
-            if self.G.nodes[node].get('start') == True:
-                return node
-        return list(self.G.nodes())[0]
+        return find_start_node(self.G)
 
     def _find_accepting_nodes(self) -> Set[str]:
         """Find accepting states (doublecircle shape or peripheries=2)."""
-        accepting = set()
-        for node in self.G.nodes():
-            nd = self.G.nodes[node]
-            if nd.get('shape') == 'doublecircle':
-                accepting.add(node)
-            elif nd.get('peripheries') in (2, '2'):
-                accepting.add(node)
-        return accepting
+        return find_accepting_nodes(self.G)
 
     # ------------------------------------------------------------------
     # Execution
@@ -123,13 +453,30 @@ class DFAExecutor:
             current = next_node
             trace.append(f"  '{symbol}' → {current}")
 
+        # If input ends on an RC node, follow the epsilon call into the subroutine.
+        # The subroutine entry (SUB_x_0) may have originally_accepting=True,
+        # which would make the string accepted — consistent with the FDFA semantics
+        # where entering an RC node is an epsilon transition.
+        if 'RC' in str(current):
+            subroutine_start = self._get_subroutine_entry(current)
+            if subroutine_start:
+                stack.append(current)
+                current = subroutine_start
+                trace.append(f"  CALL {current} (stack depth: {len(stack)}) [end-of-input]")
+
         current = self._follow_epsilon_to_accepting(current)
 
         accepted = False
         if current in self.accepting_nodes:
             nd = self.G.nodes.get(current, {})
             cluster = nd.get('cluster')
-            if not (isinstance(cluster, str) and 'subroutine' in cluster):
+            if isinstance(cluster, str) and 'subroutine' in cluster:
+                # Inside a subroutine: only accept if this node was originally
+                # an accepting state in the unfactored DFA.
+                originally = str(nd.get('originally_accepting', 'False')).strip().strip('"').strip("'")
+                if originally == 'True':
+                    accepted = True
+            else:
                 accepted = True
         trace.append(f"\nFinal: {current} ({'ACCEPT' if accepted else 'REJECT'})")
 

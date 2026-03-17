@@ -1,7 +1,7 @@
 {
     "configurations": [
         {
-            "name": "🔬 Equivalence Closure (Not Optimized)",
+            "name": "\ud83d\udd2c Equivalence Closure (Not Optimized)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/code/approaches/equivalence_closure/not_optimized/main.py",
@@ -11,7 +11,7 @@
             ]
         },
         {
-            "name": "🔬 Equivalence Closure (Optimized)",
+            "name": "\ud83d\udd2c Equivalence Closure (Optimized)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/code/approaches/equivalence_closure/optimized/main.py",
@@ -21,7 +21,7 @@
             ]
         },
         {
-            "name": "🔬 Equivalence Closure (exclusive frontiers)",
+            "name": "\ud83d\udd2c Equivalence Closure (exclusive frontiers)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/approaches/equivalence_closure/exclusive_frontiers/main.py",
@@ -34,7 +34,7 @@
             ]
         },
         {
-            "name": "🔬 No Equivalence Closure - Exclusive (Optimized + Fases Combined)",
+            "name": "\ud83d\udd2c No Equivalence Closure - Exclusive (Optimized + Fases Combined)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/approaches/no_equivalence_closure/exclusive_frontiers/optimized_fases_combined/main.py",
@@ -47,7 +47,7 @@
             ]
         },
         {
-            "name": "🔬 No Equivalence Closure - Exclusive (Optimized + Fases Separated)",
+            "name": "\ud83d\udd2c No Equivalence Closure - Exclusive (Optimized + Fases Separated)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/approaches/no_equivalence_closure/exclusive_frontiers/optimized_fases_separated/main.py",
@@ -60,7 +60,7 @@
             ]
         },
         {
-            "name": "🔬 No Equivalence Closure - Exclusive (Not Optimized)",
+            "name": "\ud83d\udd2c No Equivalence Closure - Exclusive (Not Optimized)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/code/approaches/no_equivalence_closure/exclusive_frontiers/not_optimized/main.py",
@@ -70,7 +70,7 @@
             ]
         },
         {
-            "name": "🔬 No Equivalence Closure - Hybrid Frontiers",
+            "name": "\ud83d\udd2c No Equivalence Closure - Hybrid Frontiers",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/code/approaches/no_equivalence_closure/hybrid_frontiers/main.py",
@@ -80,7 +80,7 @@
             ]
         },
         {
-            "name": "📊 Benchmark (beide varianten)",
+            "name": "\ud83d\udcca Benchmark (beide varianten)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/benchmark/benchmark.py",
@@ -90,7 +90,7 @@
             }
         },
         {
-            "name": "🧪 Language Preservation - Single String",
+            "name": "\ud83e\uddea Language Preservation - Single String",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/language_preservation/random_language_preservation.py",
@@ -105,7 +105,7 @@
             ]
         },
         {
-            "name": "🧪 Language Preservation - Random",
+            "name": "\ud83e\uddea Language Preservation - Random",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/language_preservation/random_language_preservation.py",
@@ -119,7 +119,7 @@
             ]
         },
         {
-            "name": "🧪 Language Preservation - Targeted",
+            "name": "\ud83e\uddea Language Preservation - Targeted",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/language_preservation/targeted_language_preservation.py",
@@ -133,7 +133,7 @@
             ]
         },
         {
-            "name": "🧪 Language Preservation - Targeted (verbose)",
+            "name": "\ud83e\uddea Language Preservation - Targeted (verbose)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/language_preservation/targeted_language_preservation.py",
@@ -148,7 +148,7 @@
             ]
         },
         {
-            "name": "🧪 Language Preservation - Targeted (subset)",
+            "name": "\ud83e\uddea Language Preservation - Targeted (subset)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/language_preservation/targeted_language_preservation.py",
@@ -164,7 +164,7 @@
             ]
         },
         {
-            "name": "🧪 Language Preservation - Targeted (subset + verbose)",
+            "name": "\ud83e\uddea Language Preservation - Targeted (subset + verbose)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/language_preservation/targeted_language_preservation.py",
