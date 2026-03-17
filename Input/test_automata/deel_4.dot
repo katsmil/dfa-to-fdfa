@@ -75,7 +75,7 @@ digraph G {
   c_S1 -> c_S1a [label="g"];
   c_S1a -> c_S1 [label="o"];
   c_T1 -> c_R1 [label="u"];
-  c_T1 -> F [label="i"];
+  c_T1 -> F [label="q"];
   
    
   // ---REGIO ACYCLISCH ---
