@@ -19,10 +19,16 @@ from approaches.shared import factorize as shared_factorize
 # CRITICAL FIX: Add project root to Python path
 # This must happen BEFORE any custom imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(current_dir)  # Should be .../code/
+project_root = os.path.dirname(current_dir)  # Should be .../src/
 # Ensure project root is importable so we can `import language_preservation...`
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
+
+# Also add the language_preservation directory so that
+# targeted_language_preservation.py can find dfa_executor.py via direct import
+language_preservation_dir = os.path.join(project_root, "language_preservation")
+if language_preservation_dir not in sys.path:
+    sys.path.insert(0, language_preservation_dir)
 
 # Setup variant module loaders
 def load_variant_module(variant: str, module_name: str, analyze_module=None):
@@ -139,7 +145,8 @@ class BenchmarkSuite:
             factored_graph = shared_factorize.apply_factorization(
                 graph.copy(),
                 structures,
-                strict_filter=(variant == 'EquivalenceClosure')
+                # strict_filter=(variant == 'EquivalenceClosure')
+                strict_filter=False
             )
         except Exception as e:
             print(f"\n❌ Error loading factorize module for {variant}:")
@@ -193,23 +200,27 @@ class BenchmarkSuite:
         
         return result
     
-    def verify_language_preservation(self, G_orig: nx.MultiDiGraph, 
-                                     G_fact: nx.MultiDiGraph) -> bool:
+    def verify_language_preservation(self, G_orig: nx.MultiDiGraph,
+                                     G_fact: nx.MultiDiGraph) -> Tuple[bool, List[str]]:
         """
-        Test of beide automaten dezelfde strings accepteren.
-        Gebruik random walk testing (zie implementatie hieronder).
+        Test whether both automata accept the same language.
+        Uses targeted testing: exercises every reachable state with
+        both an accept and reject suffix.
         """
         try:
-            from language_preservation.language_preservation import verify_language_preservation as lp_verify
+            from language_preservation.targeted_language_preservation import (
+                verify_language_preservation_targeted
+            )
         except Exception as e:
-            print(f"⚠️  Warning: could not import language_preservation helper: {e}")
+            print(f"⚠️  Warning: could not import targeted language preservation: {e}")
             return True, []
 
         try:
-            ok, mismatches = lp_verify(G_orig, G_fact, num_tests=200)
-            if not ok:
-                print(f"⚠️  Language preservation test found {len(mismatches)} mismatches (see details).")
-            return ok, mismatches
+            all_match, all_cases = verify_language_preservation_targeted(G_orig, G_fact)
+            mismatches = [tc.summary(show_trace=False) for tc in all_cases if tc.is_mismatch]
+            if not all_match:
+                print(f"⚠️  Language preservation: {len(mismatches)} mismatch(es) found.")
+            return all_match, mismatches
         except Exception as e:
             print(f"⚠️  Error while running language preservation tests: {e}")
             return False, [f"Error running tests: {e}"]
@@ -362,10 +373,10 @@ if __name__ == "__main__":
     # ============================================
     # Wijzig TEST_MODE om te switchen tussen test scenarios:
     # - 'joshua'           : Kleine, snelle testen (joshua voorbeelden)
-    # - 'large'           : Grotere real-world voorbeelden (url_parser, etc.)
+    # - 'real_world'           : Grotere real-world voorbeelden (url_parser, etc.)
     # - 'test_automata'   : Alle deel_*.dot files uit input/test_automata/
     # - 'custom'          : Aangepaste list - voeg je eigen testen toe
-    TEST_MODE = 'large'  # ← WIJZIG DEZE LIJN
+    TEST_MODE = 'real_world'  # ← WIJZIG DEZE LIJN
     
     if TEST_MODE == 'joshua':
         # Kleine testcases voor snelle feedback
@@ -378,7 +389,7 @@ if __name__ == "__main__":
         ]
         print("📊 Mode: QUICK (kleine testcases)")
         
-    elif TEST_MODE == 'large':
+    elif TEST_MODE == 'real_world':
         # Grotere real-world voorbeelden
         test_configs = [
             # ("url-parser", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world_examples/url-parser.dot"),
@@ -389,7 +400,7 @@ if __name__ == "__main__":
             # Voeg hier meer grote files toe:
             # ("other_large", "/path/to/other_large.dot"),
         ]
-        print("📊 Mode: LARGE (real-world voorbeelden)")
+        print("📊 Mode: REAL_WORLD (real-world voorbeelden)")
         
     elif TEST_MODE == 'test_automata':
         # Alle test_automata voorbeelden (deel_1.dot t/m deel_11.dot)

@@ -25,7 +25,11 @@ def _create_subroutine_structure(G: nx.MultiDiGraph,
                    for j, node in enumerate(sub.canonical_nodes)}
 
     for j, orig_node in enumerate(sub.canonical_nodes):
-        G.add_node(sub_mapping[orig_node], cluster=cluster_name, label=f"S{j}")
+        originally_accepting = _is_accepting_node(G, orig_node)
+        G.add_node(sub_mapping[orig_node],
+                   cluster=cluster_name,
+                   label=f"S{j}",
+                   originally_accepting=originally_accepting)
 
     start_dummy = f"__start_{cluster_name}"
     G.add_node(start_dummy, label="", shape="none", width="0", height="0",
@@ -45,6 +49,17 @@ def _create_subroutine_structure(G: nx.MultiDiGraph,
     return cluster_name, sub_mapping
 
 
+
+def _is_accepting_node(G: nx.MultiDiGraph, node: str) -> bool:
+    """
+    Returns True if the node was an accepting state in G.
+    Strips surrounding quotes to handle both shape="doublecircle" and shape=doublecircle.
+    """
+    shape = str(G.nodes[node].get('shape', '')).strip().strip('"').strip("'")
+    peripheries = str(G.nodes[node].get('peripheries', '')).strip().strip('"').strip("'")
+    return shape == 'doublecircle' or peripheries == '2'
+
+
 # ---------------------------------------------------------------------------
 # INSTANTIE VERVANGING
 # ---------------------------------------------------------------------------
@@ -56,25 +71,38 @@ def _build_instance_mapping(loc: MatchLocation,
             for loc_node, cn in zip(loc.all_nodes, sub_mapping.keys())}
 
 
+def _strip_label_quotes(label: str) -> str:
+    """Strip surrounding quotes from a DOT label value (pydot artifact)."""
+    s = str(label).strip()
+    while len(s) >= 2 and s[0] in ('"\'') and s[-1] in ('"\''):
+        s = s[1:-1].strip()
+    return s
+
+
 def _process_exits(G: nx.MultiDiGraph,
                     loc: MatchLocation,
                     instance_mapping: Dict[str, str],
                     rc_id: str):
     """
-    Handelt transities af die de subroutine verlaten.
-    Itereert alleen loc.frontiers — nodes met externe uitgaande edges.
+    Handles transitions that exit the subroutine.
+    Iterates over loc.frontiers — nodes with external outgoing edges.
+
+    Edge label strategy:
+    - If all frontier nodes can trigger a transition: label is just the symbol.
+    - If only a subset of frontier nodes can trigger it: append [SUB_x_y, ...]
+      to make the context-dependency visible.
+    The RC node label is NOT modified — dispatch info lives on the edges.
     """
     dispatch_map = defaultdict(dict)
     instance_nodes = set(loc.all_nodes)
 
+    # Step 1: collect dispatch map and mark frontier SUB nodes
     for frontier_node in loc.frontiers:
         sub_node = instance_mapping[frontier_node]
         for _, target, data in list(G.out_edges(frontier_node, data=True)):
-            label = data.get('label')
+            label = _strip_label_quotes(data.get('label', ''))
             if target not in instance_nodes:
                 dispatch_map[label][sub_node] = target
-                if not G.has_edge(rc_id, target, key=label):
-                    G.add_edge(rc_id, target, label=label, key=label)
                 G.nodes[sub_node].update({
                     "peripheries": 2,
                     "fillcolor": "lightblue",
@@ -83,11 +111,30 @@ def _process_exits(G: nx.MultiDiGraph,
 
     G.nodes[rc_id]['dispatch_map'] = dict(dispatch_map)
 
-    visual_rows = [f'"{l}": {", ".join(nodes.keys())}'
-                   for l, nodes in dispatch_map.items()]
-    mapping_str = "\\n".join(visual_rows)
-    if mapping_str:
-        G.nodes[rc_id]['label'] = f"{G.nodes[rc_id]['label']}\\n[{mapping_str}]"
+    # Step 2: full set of frontier SUB nodes
+    all_frontier_subs = set(
+        sub for sub_to_target in dispatch_map.values()
+        for sub in sub_to_target.keys()
+    )
+
+    # Step 3: group symbols by (triggering frontiers, target)
+    groups: Dict[tuple, list] = defaultdict(list)
+    for symbol, sub_to_target in dispatch_map.items():
+        triggering = frozenset(sub_to_target.keys())
+        target = next(iter(sub_to_target.values()))
+        groups[(triggering, target)].append(symbol)
+
+    # Step 4: add edges — annotate only when a subset of frontiers triggers the transition
+    for (triggering_frontiers, target), symbols in groups.items():
+        combined_symbols = ",".join(sorted(symbols))
+        if triggering_frontiers == all_frontier_subs:
+            edge_label = combined_symbols
+        else:
+            frontier_str = ", ".join(sorted(triggering_frontiers))
+            edge_label = f"{combined_symbols} [{frontier_str}]"
+
+        if not G.has_edge(rc_id, target, key=edge_label):
+            G.add_edge(rc_id, target, label=edge_label, key=edge_label)
 
 
 def _replace_instance_with_rc(G: nx.MultiDiGraph,
@@ -113,7 +160,18 @@ def _update_dispatch_maps(G: nx.MultiDiGraph,
                            replaced_by: Dict[str, str],
                            rc_nodes_with_dispatch: Set[str]):
     """
-    Werkt dispatch_maps bij van bekende RC nodes.
+    After all factorisation steps, some dispatch map targets may have been
+    replaced by RC nodes. For example, if RC_s12 originally pointed to s42,
+    and s42 was later factorised into RC_s42, the dispatch map of RC_s12 must
+    be updated to point to RC_s42 instead.
+
+    For each RC node, this function:
+      1. Updates the dispatch map: replaces any target that was factorised
+         with the RC node that replaced it.
+      2. Removes the old edge to the original target.
+      3. Adds a new edge to the RC node that replaced it, preserving the
+         existing edge label exactly — no label modification is needed because
+         the transition semantics (which symbol, which frontier) are unchanged.
     """
     for node in rc_nodes_with_dispatch:
         data = G.nodes[node]
@@ -121,29 +179,32 @@ def _update_dispatch_maps(G: nx.MultiDiGraph,
             continue
 
         dispatch_map = data['dispatch_map']
-        updated = False
 
         for label, sub_to_target in dispatch_map.items():
             for sub_node, target in list(sub_to_target.items()):
                 if target in replaced_by:
                     new_target = replaced_by[target]
+
+                    # Step 1: update the dispatch map entry to point to the new RC node.
                     sub_to_target[sub_node] = new_target
-                    updated = True
 
-                    if G.has_edge(node, target, key=label):
-                        G.remove_edge(node, target, key=label)
-                    if not G.has_edge(node, new_target, key=label):
-                        G.add_edge(node, new_target, label=label, key=label)
-
-        if updated:
-            visual_rows = [
-                f'"{l}": {", ".join(nodes.keys())}'
-                for l, nodes in dispatch_map.items()
-            ]
-            mapping_str = "\\n".join(visual_rows)
-            base_label = data['label'].split("\\n[")[0]
-            if mapping_str:
-                G.nodes[node]['label'] = f"{base_label}\\n[{mapping_str}]"
+                    # Step 2 & 3: remove the old edge and add a new one to the RC node.
+                    # Edge keys may be "symbol" or "symbol [SUB_x_y]" depending on
+                    # whether the transition was triggered by all frontiers or a subset.
+                    # We match on the symbol prefix (before any " [") to find the right edges,
+                    # then re-add them with the exact same label so no annotation is lost.
+                    if G.has_edge(node, target):
+                        keys_to_remove = [
+                            k for k, d in G[node][target].items()
+                            if _strip_label_quotes(d.get('label', '')).split(' [')[0]
+                               == _strip_label_quotes(label)
+                        ]
+                        for k in keys_to_remove:
+                            old_edge_label = G[node][target][k].get('label', label)
+                            G.remove_edge(node, target, key=k)
+                            if not G.has_edge(node, new_target, key=k):
+                                G.add_edge(node, new_target,
+                                           label=old_edge_label, key=k)
 
 
 # ---------------------------------------------------------------------------
