@@ -142,6 +142,10 @@ def _find_suffix_to_reject(node: str,
         # Node itself is already rejecting
         return []
 
+    # Bereken het volledige alfabet eenmalig buiten de BFS-lus.
+    # (Niet per iteratie herberekenen — dat is O(states * transitions) per stap.)
+    all_syms = set(sym for trans in table.values() for sym in trans.keys())
+
     visited: Dict[str, List[str]] = {node: []}
     queue: deque = deque([node])
 
@@ -150,7 +154,6 @@ def _find_suffix_to_reject(node: str,
 
         # Try a symbol for which no transition is defined → immediate reject
         defined_syms = set(table.get(cur, {}).keys())
-        all_syms = set(sym for trans in table.values() for sym in trans.keys())
         dead_syms = all_syms - defined_syms
         if dead_syms:
             return visited[cur] + [sorted(dead_syms)[0]]

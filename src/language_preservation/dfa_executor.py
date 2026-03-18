@@ -426,12 +426,17 @@ class DFAExecutor:
         trace = [f"Start: {current}"]
 
         for symbol in input_string:
-            if 'RC' in current:
+            # Chain nested calls: if current is an RC node (or lands on one after
+            # entering a subroutine), keep entering subroutines until we reach a
+            # plain state that can take a normal transition.
+            while 'RC' in str(current):
                 subroutine_start = self._get_subroutine_entry(current)
                 if subroutine_start:
                     stack.append(current)
                     current = subroutine_start
                     trace.append(f"  CALL {current} (stack depth: {len(stack)})")
+                else:
+                    break
 
             next_node = self._take_transition(current, symbol)
 
@@ -451,7 +456,12 @@ class DFAExecutor:
                             dispatched = True
                             break
                         else:
-                            trace.append(f"  (transparent return through {rc_node})")
+                            trace.append(f"  (return through {rc_node})")
+                            # Als de RC node zelf een frontier is van zijn moeder-
+                            # subroutine (peripheries=2), dan wordt hij het nieuwe
+                            # huidige frontier-punt voor de buitenste aanroeper.
+                            if self._is_frontier(rc_node):
+                                current = rc_node
 
                     if not dispatched:
                         trace.append(f"  REJECT: δret(..., {current}, '{symbol}') undefined on all stack frames")
@@ -583,10 +593,16 @@ class DFAExecutor:
         return None
 
     def _is_frontier(self, node: str) -> bool:
-        """Check whether a node is a frontier (accepting state belonging to a subroutine)."""
+        """Check whether a node is a frontier of its subroutine."""
+        nd = self.G.nodes.get(node, {})
+        # Een geneste RC node met peripheries=2 is een frontier van zijn
+        # moeder-subroutine: bij terugkeer fungeert hij als exitpunt.
+        if 'RC' in str(node):
+            peripheries = str(nd.get('peripheries', '')).strip().strip('"').strip("'")
+            return peripheries == '2'
+        # Gewone frontier: subroutine-node met peripheries=2.
         if node not in self.accepting_nodes:
             return False
-        nd = self.G.nodes.get(node, {})
         cluster = nd.get('cluster')
         if isinstance(cluster, str) and 'subroutine' in cluster:
             return True

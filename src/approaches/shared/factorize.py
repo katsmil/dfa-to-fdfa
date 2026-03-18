@@ -28,7 +28,7 @@ def _create_subroutine_structure(G: nx.MultiDiGraph,
         originally_accepting = _is_accepting_node(G, orig_node)
         G.add_node(sub_mapping[orig_node],
                    cluster=cluster_name,
-                   label=f"S{j}",
+                   label=f"sub{sub_id}.{j}",
                    originally_accepting=originally_accepting)
 
     start_dummy = f"__start_{cluster_name}"
@@ -158,6 +158,7 @@ def _replace_instance_with_rc(G: nx.MultiDiGraph,
         start_cluster = G.nodes[loc.start_node].get('cluster')
         if start_cluster:
             rc_attrs['cluster'] = start_cluster
+            # peripheries=2 wordt pas gezet na _process_exits (zie hieronder).
         G.add_node(rc_id, **rc_attrs)
 
     instance_nodes = set(loc.all_nodes)
@@ -166,6 +167,22 @@ def _replace_instance_with_rc(G: nx.MultiDiGraph,
             G.add_edge(u, rc_id, **data)
 
     _process_exits(G, loc, instance_mapping, rc_id)
+
+    # Een geneste RC node is alleen een frontier van zijn moeder-subroutine als
+    # minstens één van de vervangen instance-nodes zelf al frontier was
+    # (peripheries=2). De RC node neemt dan de frontier-rol van die node over.
+    #
+    # Let op: als de dispatch-target van deze RC node een frontier is, wordt de
+    # RC node zelf NIET frontier — de controle keert terug naar de aanroeper
+    # vanuit die frontier-node, niet vanuit de RC node.
+    parent_cluster = G.nodes[rc_id].get('cluster')
+    if parent_cluster:
+        for orig_node in loc.all_nodes:
+            if G.has_node(orig_node):
+                p = str(G.nodes[orig_node].get('peripheries', '')).strip().strip('"').strip("'")
+                if p == '2':
+                    G.nodes[rc_id].update({'peripheries': 2})
+                    break
 
 
 def _update_dispatch_maps(G: nx.MultiDiGraph,
@@ -242,8 +259,7 @@ def _update_dispatch_maps(G: nx.MultiDiGraph,
                 ]
                 for old_key, new_key in keys_to_swap:
                     target = sub_to_target.pop(old_key)
-                    if new_key not in sub_to_target:
-                        sub_to_target[new_key] = target
+                    sub_to_target[new_key] = target
 
 
 # ---------------------------------------------------------------------------
@@ -267,6 +283,37 @@ def _is_valid_entry_structure(G: nx.MultiDiGraph,
 # FILTERING
 # ---------------------------------------------------------------------------
 
+def _build_dispatch_signatures(G: nx.MultiDiGraph) -> Dict[str, Dict[str, str]]:
+    """
+    Bouw per node een 'dispatch signature': {symbol: target} over alle RC nodes
+    waarvan de dispatch_map deze node als frontier-key bevat.
+
+    Twee nodes die dezelfde canonicale positie in een subroutine innemen mogen
+    alleen samengevoegd worden als hun dispatch-signaturen identiek zijn.
+    Anders zou het samenvoegen informatie vernietigen in de dispatch_map van de
+    aanroepende RC node.
+    """
+    import ast as _ast
+    signatures: Dict[str, Dict[str, str]] = {}
+    for _, data in G.nodes(data=True):
+        dm = data.get('dispatch_map')
+        if dm is None:
+            continue
+        if isinstance(dm, str):
+            try:
+                dm = _ast.literal_eval(dm.strip().strip('"'))
+            except Exception:
+                continue
+        if not isinstance(dm, dict):
+            continue
+        for sym, sub_to_target in dm.items():
+            if not isinstance(sub_to_target, dict):
+                continue
+            for frontier_node, target in sub_to_target.items():
+                signatures.setdefault(frontier_node, {})[sym] = target
+    return signatures
+
+
 def _filter_strict(G: nx.MultiDiGraph,
                     sub: CanonicalSubstructure,
                     sub_mapping: Dict[str, str],
@@ -288,11 +335,16 @@ def _filter_strict(G: nx.MultiDiGraph,
 def _filter_soft(G: nx.MultiDiGraph,
                   sub: CanonicalSubstructure,
                   sub_mapping: Dict[str, str],
-                  processed_nodes: Set[str]) -> Tuple[List, bool]:
+                  processed_nodes: Set[str],
+                  dispatch_signatures: Optional[Dict[str, Dict[str, str]]] = None) -> Tuple[List, bool]:
     """
-    Zachte filter (NoEquivalenceClosure): ongeldige (namelijk incoming edges op nodes <> startnode)
-    of overlappende locaties (want al eerder gefactoriseerd) worden overgeslagen, 
-    de rest wordt wel geprobeerd.
+    Zachte filter (NoEquivalenceClosure): ongeldige of overlappende locaties worden
+    overgeslagen, de rest wordt geprobeerd.
+
+    Extra check (dispatch_signatures): twee locaties mogen alleen samengevoegd worden
+    als voor elke canonicale positie de bijbehorende nodes identieke dispatch-signaturen
+    hebben in alle aanroepende RC nodes. Zo niet, dan zijn de nodes functioneel
+    onderscheidbaar en mag samenvoeging de dispatch_map van aanroepers niet beschadigen.
     """
     valid = []
     nodes_in_batch: Set[str] = set()
@@ -305,6 +357,22 @@ def _filter_soft(G: nx.MultiDiGraph,
             continue
         if not _is_valid_entry_structure(G, loc.start_node, loc_nodes):
             continue
+
+        # Dispatch-signature check: elke node in deze locatie moet dezelfde
+        # dispatch-signature hebben als de corresponderende node in de eerste
+        # reeds geaccepteerde locatie (of de canonical nodes als er nog geen is).
+        if dispatch_signatures is not None and valid:
+            first_nodes = valid[0][0].all_nodes
+            compatible = True
+            for ref_node, cand_node in zip(first_nodes, loc.all_nodes):
+                ref_sig  = dispatch_signatures.get(ref_node,  {})
+                cand_sig = dispatch_signatures.get(cand_node, {})
+                if ref_sig != cand_sig:
+                    compatible = False
+                    break
+            if not compatible:
+                continue
+
         valid.append((loc, _build_instance_mapping(loc, sub_mapping)))
         nodes_in_batch.update(loc_nodes)
 
@@ -322,15 +390,39 @@ def apply_factorization(G: nx.MultiDiGraph,
     nodes_to_remove: Set[str] = set()
     replaced_by: Dict[str, str] = {}
     rc_nodes_with_dispatch: Set[str] = set()
-    frontier_key_replacements: Dict[str, str] = {}
+    frontier_key_replacements: Dict[str, str] = {}  # loc_node → rc_id  (dispatch_map key updates)
+    sub_node_peripheries: Dict[str, str] = {}       # loc_node → sub_node (peripheries propagation)
     _filter = _filter_strict if strict_filter else _filter_soft
 
-    for sub_id, sub in enumerate(results):
+    # Pre-compute dispatch signatures for the incompatibility check in _filter_soft.
+    # Only needed for the soft filter; computed once over the current graph state.
+    dispatch_signatures: Optional[Dict[str, Dict[str, str]]] = (
+        _build_dispatch_signatures(G) if not strict_filter else None
+    )
+
+    # Determine starting sub_id to avoid name collisions with SUB_ nodes
+    # already present in G from a previous apply_factorization call.
+    existing_sub_ids: set = set()
+    for node in G.nodes():
+        s = str(node)
+        if s.startswith('SUB_'):
+            parts = s.split('_')
+            if len(parts) >= 3:
+                try:
+                    existing_sub_ids.add(int(parts[1]))
+                except ValueError:
+                    pass
+    sub_id_start = (max(existing_sub_ids) + 1) if existing_sub_ids else 0
+
+    for sub_id_offset, sub in enumerate(results):
+        sub_id = sub_id_start + sub_id_offset
         sub_name = f"subroutine_{sub_id}"
         sub_mapping = {node: f"SUB_{sub_id}_{j}"
                        for j, node in enumerate(sub.canonical_nodes)}
 
-        valid_locations, is_group_valid = _filter(G, sub, sub_mapping, processed_nodes)
+        valid_locations, is_group_valid = _filter(
+            G, sub, sub_mapping, processed_nodes, dispatch_signatures
+        ) if not strict_filter else _filter(G, sub, sub_mapping, processed_nodes)
 
         if is_group_valid and len(valid_locations) >= 2:
             _create_subroutine_structure(G, sub, sub_id)
@@ -340,11 +432,21 @@ def apply_factorization(G: nx.MultiDiGraph,
                 _replace_instance_with_rc(G, loc, sub_name, instance_mapping)
                 rc_nodes_with_dispatch.add(rc_id)
 
-                # Track which concrete nodes map to which canonical SUB nodes.
-                # Used to update dispatch_map KEYS when frontier blueprint nodes
-                # are removed (needed for correct second-run factorization).
+                # Track which concrete nodes are replaced by this RC node.
+                # Used to update dispatch_map KEYS in outer RC nodes: the old
+                # frontier keys (e.g. SUB_29_1, SUB_29_2) are replaced by the
+                # nested RC node (e.g. RC_SUB_29_1) which acts as the new
+                # frontier of the parent subroutine.
+                for loc_node in loc.all_nodes:
+                    frontier_key_replacements[loc_node] = rc_id
+
+                # Separate mapping used to propagate peripheries=2 to the
+                # canonical SUB nodes of the inner subroutine.  These nodes
+                # inherited their frontier status from the blueprint nodes they
+                # replaced, but _process_exits cannot detect it (blueprint nodes
+                # have no graph-level external edges — those live in dispatch_maps).
                 for loc_node, sub_node in instance_mapping.items():
-                    frontier_key_replacements[loc_node] = sub_node
+                    sub_node_peripheries[loc_node] = sub_node
 
                 for original_node in loc.all_nodes:
                     replaced_by[original_node] = rc_id
@@ -352,10 +454,11 @@ def apply_factorization(G: nx.MultiDiGraph,
                 nodes_to_remove.update(loc.all_nodes)
                 processed_nodes.update(loc.all_nodes)
 
-    # Propagate peripheries=2 (frontier) marking to the new canonical SUB nodes
-    # if the concrete nodes they replace were frontier-marked. This ensures
-    # correct visualization and dispatch semantics after second-run factorization.
-    for old_node, new_sub_node in frontier_key_replacements.items():
+    # Propagate peripheries=2 to the canonical SUB nodes of inner subroutines.
+    # Blueprint nodes have no graph-level external edges (those are in dispatch_maps),
+    # so _process_exits cannot mark them as frontiers. We recover the frontier
+    # status from the original SUB nodes they replaced.
+    for old_node, new_sub_node in sub_node_peripheries.items():
         if G.has_node(old_node) and G.has_node(new_sub_node):
             old_peripheries = G.nodes[old_node].get('peripheries')
             if old_peripheries == 2 or str(old_peripheries).strip('"') == '2':
