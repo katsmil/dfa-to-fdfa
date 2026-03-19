@@ -102,6 +102,41 @@
             }
         },
         {
+            "name": "🔬 Nested Calls",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/approaches/no_equivalence_closure_nested_calls/main.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [
+                "${input:inputFile}"
+            ],
+            "presentation": {
+                "group": "2_approaches",
+                "order": 5
+            }
+        },
+        {
+            "name": "🔬 Nested Calls (no debug)",
+            "type": "debugpy",
+            "request": "launch",
+            "noDebug": true,
+            "program": "${workspaceFolder}/src/approaches/no_equivalence_closure_nested_calls/main.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [
+                "${input:inputFile}"
+            ],
+            "presentation": {
+                "group": "2_approaches",
+                "order": 6
+            }
+        },
+        {
             "name": "📊 Benchmark (beide varianten)",
             "type": "debugpy",
             "request": "launch",
@@ -112,7 +147,7 @@
             },
             "presentation": {
                 "group": "2_approaches",
-                "order": 5
+                "order": 7
             }
         },
         {
@@ -242,14 +277,8 @@
         {
             "id": "inputFile",
             "type": "promptString",
-            "description": "input file path (bijv. input/<filename>.dot)",
-            "default": "input/scc_single_preheader_entry.dot"
-        },
-        {
-            "id": "nodeName",
-            "type": "promptString",
-            "description": "Node name (bijv. P1)",
-            "default": "P1"
+            "description": "input file path (bijv. input/miscellaneous/bigSmall.dot)",
+            "default": "input/miscellaneous/bigSmall.dot"
         },
         {
             "id": "lp_orig",
