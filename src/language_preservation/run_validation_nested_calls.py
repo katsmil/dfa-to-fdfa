@@ -3,9 +3,9 @@ Validatie: factoreer elk testbestand en controleer taalpreservatie.
 Draait volledig in-process (geen subprocessen) zodat er geen timeout-issues zijn.
 
 Gebruik:
-  python3 run_validation.py                  → test alle subfolders van input/
-  python3 run_validation.py test_automata    → alleen die subfolder(s)
-  python3 run_validation.py miscellaneous real_world
+  python3 src/language_preservation/run_validation_nested_calls.py                  → test alle subfolders van input/
+  python3 src/language_preservation/run_validation_nested_calls.py test_automata    → alleen die subfolder(s)
+  python3 src/language_preservation/run_validation_nested_calls.py miscellaneous real_world
 """
 
 import sys
@@ -15,29 +15,69 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 # Paden instellen zodat alle imports werken
 # ---------------------------------------------------------------------------
-SRC        = Path(__file__).parent          # src/
+SRC        = Path(__file__).parent.parent          # src/
 INPUT_ROOT = SRC.parent / "input"
 OUTPUT_DIR = SRC / "output"
+ANALYZE_DIR = SRC / "approaches/no_equivalence_closure"
 
-for p in [str(SRC), str(SRC / "language_preservation")]:
+for p in [str(SRC), str(ANALYZE_DIR), str(SRC / "language_preservation")]:
     if p not in sys.path:
         sys.path.insert(0, p)
 
 import networkx as nx
-from approaches.no_equivalence_closure.analyze import run_analysis
+from analyze import run_analysis
 from approaches.shared.factorize import apply_factorization, save_dot
+from approaches.shared.shared_types import MatchLocation, CanonicalSubstructure
 from targeted_language_preservation import TargetedLanguagePreservationTester
 
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helpers (overgenomen uit main.py)
 # ---------------------------------------------------------------------------
+
+def _recompute_frontiers(results, G_full):
+    patched = []
+    for sub in results:
+        patched_locs = []
+        for loc in sub.locations:
+            nodes_set = set(loc.all_nodes)
+            internals, frontiers = [], []
+            for n in loc.all_nodes:
+                has_external = any(
+                    t not in nodes_set
+                    for _, t, _ in G_full.out_edges(n, data=True)
+                )
+                (frontiers if has_external else internals).append(n)
+            patched_locs.append(MatchLocation(
+                start_node=loc.start_node,
+                all_nodes=loc.all_nodes,
+                internals=tuple(internals),
+                frontiers=tuple(frontiers),
+            ))
+        patched.append(CanonicalSubstructure(
+            canonical_nodes=sub.canonical_nodes,
+            overlap_size=sub.overlap_size,
+            locations=tuple(patched_locs),
+            blueprint_edges=sub.blueprint_edges,
+        ))
+    return patched
+
 
 def factorize(dot_file: Path) -> nx.MultiDiGraph:
     G_orig = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(str(dot_file)))
     results = run_analysis(G_orig)
-    return apply_factorization(G_orig, results, strict_filter=False)
+    G_factorized = apply_factorization(G_orig, results, strict_filter=False)
+
+    sub_nodes = [n for n in G_factorized.nodes() if str(n).startswith('SUB_')]
+    if sub_nodes:
+        G_sub = nx.MultiDiGraph(G_factorized.subgraph(sub_nodes))
+        results2 = run_analysis(G_sub)
+        if results2:
+            results2 = _recompute_frontiers(results2, G_factorized)
+            G_factorized = apply_factorization(G_factorized, results2, strict_filter=False)
+
+    return G_factorized
 
 
 # ---------------------------------------------------------------------------
@@ -45,12 +85,7 @@ def factorize(dot_file: Path) -> nx.MultiDiGraph:
 # ---------------------------------------------------------------------------
 
 if len(sys.argv) > 1:
-    # Accepteer zowel losse argumenten als één spatie-gescheiden string
-    # (VS Code launch.json geeft promptString als één argument)
-    raw = sys.argv[1:]
-    if len(raw) == 1 and ' ' in raw[0]:
-        raw = raw[0].split()
-    subfolders = [INPUT_ROOT / name for name in raw]
+    subfolders = [INPUT_ROOT / name for name in sys.argv[1:]]
 else:
     subfolders = sorted(
         p for p in INPUT_ROOT.iterdir()
@@ -80,15 +115,17 @@ def test_folder(folder: Path) -> list:
             continue
 
         # Stap 2: taalpreservatie-test
-        _old_stdout = sys.stdout
         try:
+            # Herlaad gefactoriseerde graaf vanuit DOT zodat attributen genormaliseerd zijn
             G_fact_reloaded = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(str(output_dot)))
             tester = TargetedLanguagePreservationTester(G_orig, G_fact_reloaded)
+            # Suppress de print van de tester
+            _old_stdout = sys.stdout
             sys.stdout = io.StringIO()
             all_match, all_cases = tester.run()
             sys.stdout = _old_stdout
         except Exception as e:
-            sys.stdout = _old_stdout
+            sys.stdout = _old_stdout if '_old_stdout' in dir() else sys.stdout
             print("FOUT (test)")
             results.append((name, "FOUT (test mislukt)", str(e)))
             continue
@@ -107,20 +144,19 @@ def test_folder(folder: Path) -> list:
     return results
 
 
-# ---------------------------------------------------------------------------
-# Uitvoeren
-# ---------------------------------------------------------------------------
-
-all_results = []
+# Verwerk alle subfolders
+all_results = []  # (folder_name, name, status, detail)
 for folder in subfolders:
     if not folder.is_dir():
         print(f"⚠️  Map niet gevonden: {folder}")
         continue
     folder_results = test_folder(folder)
+    if not folder_results:
+        continue
     for entry in folder_results:
         all_results.append((folder.name,) + entry)
 
-# Samenvatting
+# Samenvatting per sectie
 print()
 current_folder = None
 for folder_name, name, status, detail in all_results:
@@ -133,6 +169,7 @@ for folder_name, name, status, detail in all_results:
         current_folder = folder_name
     print(f"  {name:<35}  {status}")
     if detail and "FAILED" in status:
+        # Toon eerste mismatch-blok
         lines = detail.splitlines()
         for i, line in enumerate(lines):
             if "MISMATCH" in line:

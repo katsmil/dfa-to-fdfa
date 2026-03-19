@@ -4,7 +4,7 @@
             "name": "\u2705 Run Validation",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/run_validation.py",
+            "program": "${workspaceFolder}/src/language_preservation/run_validation.py",
             "console": "integratedTerminal",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
