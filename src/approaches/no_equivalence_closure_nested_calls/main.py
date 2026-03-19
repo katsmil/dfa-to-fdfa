@@ -4,48 +4,6 @@ from pathlib import Path
 
 from approaches.no_equivalence_closure.analyze import run_analysis
 from approaches.shared.factorize import apply_factorization, save_dot
-from approaches.shared.shared_types import MatchLocation, CanonicalSubstructure
-
-
-def _recompute_frontiers(results, G_full):
-    """
-    Herbereken internals/frontiers voor elke MatchLocation op basis van de volledige graaf.
-
-    run_analysis draait op G_sub (alleen SUB_* nodes). Daarin ontbreken twee soorten
-    'externe' edges:
-      1. Edges naar hoofdautomaat-nodes (suffix-geval: SUB_x_last heeft geen blueprint-edges)
-      2. Edges naar andere SUB_* nodes buiten de match (midden-geval: SUB_x_mid → SUB_x_next)
-
-    Voor geval 1: geen externe edges → frontier leeg → dispatch_map leeg →
-                  executor handelt het af via transparant doorborrelen.
-    Voor geval 2: externe edge aanwezig in G_full → frontier correct gedetecteerd →
-                  _process_exits vult dispatch_map met de juiste interne vervolgnode.
-    """
-    patched = []
-    for sub in results:
-        patched_locs = []
-        for loc in sub.locations:
-            nodes_set = set(loc.all_nodes)
-            internals, frontiers = [], []
-            for n in loc.all_nodes:
-                has_external = any(
-                    t not in nodes_set
-                    for _, t, _ in G_full.out_edges(n, data=True)
-                )
-                (frontiers if has_external else internals).append(n)
-            patched_locs.append(MatchLocation(
-                start_node=loc.start_node,
-                all_nodes=loc.all_nodes,
-                internals=tuple(internals),
-                frontiers=tuple(frontiers),
-            ))
-        patched.append(CanonicalSubstructure(
-            canonical_nodes=sub.canonical_nodes,
-            overlap_size=sub.overlap_size,
-            locations=tuple(patched_locs),
-            blueprint_edges=sub.blueprint_edges,
-        ))
-    return patched
 
 
 def factorize(G: nx.MultiDiGraph) -> nx.MultiDiGraph:
@@ -67,7 +25,6 @@ def factorize(G: nx.MultiDiGraph) -> nx.MultiDiGraph:
         G_sub = nx.MultiDiGraph(G.subgraph(sub_nodes))
         results2 = run_analysis(G_sub)
         if results2:
-            results2 = _recompute_frontiers(results2, G)
             G = apply_factorization(G, results2)
 
     return G
