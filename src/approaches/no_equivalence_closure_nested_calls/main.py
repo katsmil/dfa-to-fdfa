@@ -59,7 +59,7 @@ def factorize(G: nx.MultiDiGraph) -> nx.MultiDiGraph:
 
     # Pass 1
     results = run_analysis(G)
-    G = apply_factorization(G, results, strict_filter=False)
+    G = apply_factorization(G, results)
 
     # Pass 2
     sub_nodes = [n for n in G.nodes() if str(n).startswith('SUB_')]
@@ -68,7 +68,7 @@ def factorize(G: nx.MultiDiGraph) -> nx.MultiDiGraph:
         results2 = run_analysis(G_sub)
         if results2:
             results2 = _recompute_frontiers(results2, G)
-            G = apply_factorization(G, results2, strict_filter=False)
+            G = apply_factorization(G, results2)
 
     return G
 

@@ -67,7 +67,7 @@ def _recompute_frontiers(results, G_full):
 def factorize(dot_file: Path) -> nx.MultiDiGraph:
     G_orig = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(str(dot_file)))
     results = run_analysis(G_orig)
-    G_factorized = apply_factorization(G_orig, results, strict_filter=False)
+    G_factorized = apply_factorization(G_orig, results)
 
     sub_nodes = [n for n in G_factorized.nodes() if str(n).startswith('SUB_')]
     if sub_nodes:
@@ -75,7 +75,7 @@ def factorize(dot_file: Path) -> nx.MultiDiGraph:
         results2 = run_analysis(G_sub)
         if results2:
             results2 = _recompute_frontiers(results2, G_factorized)
-            G_factorized = apply_factorization(G_factorized, results2, strict_filter=False)
+            G_factorized = apply_factorization(G_factorized, results2)
 
     return G_factorized
 

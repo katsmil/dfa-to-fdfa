@@ -316,39 +316,21 @@ def _build_dispatch_signatures(G: nx.MultiDiGraph) -> Dict[str, Dict[str, Dict[s
     return rc_dispatch
 
 
-def _filter_strict(G: nx.MultiDiGraph,
-                    sub: CanonicalSubstructure,
-                    sub_mapping: Dict[str, str],
-                    processed_nodes: Set[str]) -> Tuple[List, bool]:
-    """
-    Harde filter (EquivalenceClosure): bij eerste ongeldige locatie
-    wordt de hele groep afgewezen. --> werd eerder toegepast bij EquivalenceClosure variant.
-    """
-    valid = []
-    for loc in sub.locations:
-        if any(n in processed_nodes for n in loc.all_nodes):
-            return [], False
-        if not _is_valid_entry_structure(G, loc.start_node, set(loc.all_nodes)):
-            return [], False
-        valid.append((loc, _build_instance_mapping(loc, sub_mapping)))
-    return valid, True
-
-
-def _filter_soft(G: nx.MultiDiGraph,
+def _filter_locations(G: nx.MultiDiGraph,
                   sub: CanonicalSubstructure,
                   sub_mapping: Dict[str, str],
                   processed_nodes: Set[str],
                   dispatch_signatures: Optional[Dict[str, Dict[str, Dict[str, str]]]] = None) -> Tuple[List, bool]:
     """
-    Zachte filter (NoEquivalenceClosure): ongeldige of overlappende locaties worden
-    overgeslagen, de rest wordt geprobeerd.
+    Filtert de locaties van een subroutinepatroon. Ongeldige of overlappende
+    locaties worden overgeslagen; de rest wordt geprobeerd.
 
-    Extra check (dispatch_signatures): twee locaties mogen alleen samengevoegd worden
-    als er geen enkele RC-node bestaat die zowel ref_node als cand_node (op dezelfde
-    canonicale positie) als frontier-key heeft voor hetzelfde label met VERSCHILLENDE
-    targets. In dat geval raken de exit-paden van die RC-node verward na samenvoeging.
-    Nodes die door verschillende RC-nodes worden aangesproken zijn veilig samen te
-    voegen — elke outer RC-node behoudt zijn eigen dispatch-entry ongewijzigd.
+    dispatch_signatures-check: twee locaties mogen alleen samengevoegd worden
+    als er geen RC-node bestaat die zowel ref_node als cand_node (op dezelfde
+    canonicale positie) als frontier-key heeft voor hetzelfde label met
+    verschillende targets. In dat geval raken de exit-paden van die RC-node
+    verward na samenvoeging. Nodes die door verschillende RC-nodes worden
+    aangesproken zijn altijd veilig samen te voegen.
     """
     valid = []
     nodes_in_batch: Set[str] = set()
@@ -419,29 +401,15 @@ def _filter_soft(G: nx.MultiDiGraph,
 # ---------------------------------------------------------------------------
 
 def apply_factorization(G: nx.MultiDiGraph,
-                         results: List[CanonicalSubstructure],
-                         strict_filter: bool = True,
-                         check_dispatch_signatures: bool = True) -> nx.MultiDiGraph:
+                         results: List[CanonicalSubstructure]) -> nx.MultiDiGraph:
     processed_nodes: Set[str] = set()
     nodes_to_remove: Set[str] = set()
     replaced_by: Dict[str, str] = {}
     rc_nodes_with_dispatch: Set[str] = set()
     frontier_key_replacements: Dict[str, str] = {}  # loc_node → rc_id  (dispatch_map key updates)
     sub_node_peripheries: Dict[str, str] = {}       # loc_node → sub_node (peripheries propagation)
-    _filter = _filter_strict if strict_filter else _filter_soft
 
-    # Pre-compute dispatch signatures for the incompatibility check in _filter_soft.
-    # Only needed for the soft filter; skipped when check_dispatch_signatures=False
-    # (second-run blueprint factorization: blueprint nodes from different subroutines
-    # legitimately have different dispatch signatures — their calling contexts differ —
-    # but that does NOT prevent safe factorization because _process_exits and
-    # _update_dispatch_maps handle per-instance dispatch correctly via
-    # frontier_key_replacements).
-    dispatch_signatures: Optional[Dict[str, Dict[str, str]]] = (
-        _build_dispatch_signatures(G)
-        if not strict_filter and check_dispatch_signatures
-        else None
-    )
+    dispatch_signatures: Optional[Dict[str, Dict[str, str]]] = _build_dispatch_signatures(G)
 
     # Determine starting sub_id to avoid name collisions with SUB_ nodes
     # already present in G from a previous apply_factorization call.
@@ -463,9 +431,8 @@ def apply_factorization(G: nx.MultiDiGraph,
         sub_mapping = {node: f"SUB_{sub_id}_{j}"
                        for j, node in enumerate(sub.canonical_nodes)}
 
-        valid_locations, is_group_valid = _filter(
-            G, sub, sub_mapping, processed_nodes, dispatch_signatures
-        ) if not strict_filter else _filter(G, sub, sub_mapping, processed_nodes)
+        valid_locations, is_group_valid = _filter_locations(
+            G, sub, sub_mapping, processed_nodes, dispatch_signatures)
 
         if is_group_valid and len(valid_locations) >= 2:
             _create_subroutine_structure(G, sub, sub_id)

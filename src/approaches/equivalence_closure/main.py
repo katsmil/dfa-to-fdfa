@@ -10,7 +10,7 @@ def factorize(G: nx.MultiDiGraph) -> nx.MultiDiGraph:
     """1-pass factorisatie met equivalentiesluiting."""
     G = G.copy()
     results = run_analysis(G)
-    return apply_factorization(G, results, strict_filter=False)
+    return apply_factorization(G, results)
 
 
 def main():

@@ -144,9 +144,7 @@ class BenchmarkSuite:
             # Gebruik altijd de gedeelde factorize
             factored_graph = shared_factorize.apply_factorization(
                 graph.copy(),
-                structures,
-                # strict_filter=(variant == 'EquivalenceClosure')
-                strict_filter=False
+                structures
             )
         except Exception as e:
             print(f"\n❌ Error loading factorize module for {variant}:")
