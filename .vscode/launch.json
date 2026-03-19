@@ -1,6 +1,17 @@
 {
     "configurations": [
         {
+            "name": "\u2705 Run Validation",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/run_validation.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": "${input:validationFolders}"
+        },
+        {
             "name": "\ud83d\udd2c Equivalence Closure (Not Optimized)",
             "type": "debugpy",
             "request": "launch",
@@ -182,6 +193,12 @@
         }
     ],
     "inputs": [
+        {
+            "id": "validationFolders",
+            "type": "promptString",
+            "description": "Subfolders om te testen (spatie-gescheiden)",
+            "default": "joshua test_automata real_world"
+        },
         {
             "id": "inputFile",
             "type": "promptString",

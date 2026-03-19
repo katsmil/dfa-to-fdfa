@@ -49,12 +49,12 @@ def load_variant_module(variant: str, module_name: str, analyze_module=None):
     if variant == 'NoEquivalenceClosure':
         module_path = os.path.join(
             project_root, "approaches", "no_equivalence_closure", 
-            "exclusive_frontiers", "optimized_fases_combined", f"{module_name}.py"
+            f"{module_name}.py"
         )
     else:  # EquivalenceClosure
         module_path = os.path.join(
             project_root, "approaches", "equivalence_closure", 
-            "exclusive_frontiers", f"{module_name}.py"
+            f"{module_name}.py"
         )
     module_name_unique = f"{variant}_{module_name}"
     spec = importlib.util.spec_from_file_location(module_name_unique, module_path)
