@@ -17,7 +17,7 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 SRC        = Path(__file__).parent.parent          # src/
 INPUT_ROOT = SRC.parent / "input"
-OUTPUT_DIR = SRC / "output"
+OUTPUT_DIR = SRC.parent / "output"
 ANALYZE_DIR = SRC / "approaches/no_equivalence_closure"
 
 for p in [str(SRC), str(ANALYZE_DIR), str(SRC / "language_preservation")]:
@@ -102,15 +102,13 @@ def test_folder(folder: Path) -> list:
     for dot_file in dot_files:
         name = dot_file.stem
         output_dot = OUTPUT_DIR / f"{name}_COMBINED.dot"
-        print(f"  [{folder.name}] {name} ... ", end="", flush=True)
-
         # Stap 1: factorizeer
         try:
             G_orig = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(str(dot_file)))
             G_factorized = factorize(dot_file)
             save_dot(G_factorized, str(output_dot))
         except Exception as e:
-            print("FOUT (factorizatie)")
+            print(f"  [{folder.name}] {name} ... FOUT (factorizatie)")
             results.append((name, "FOUT (factorizatie mislukt)", str(e)))
             continue
 
@@ -126,7 +124,7 @@ def test_folder(folder: Path) -> list:
             sys.stdout = _old_stdout
         except Exception as e:
             sys.stdout = _old_stdout if '_old_stdout' in dir() else sys.stdout
-            print("FOUT (test)")
+            print(f"  [{folder.name}] {name} ... FOUT (test)")
             results.append((name, "FOUT (test mislukt)", str(e)))
             continue
 
@@ -134,10 +132,9 @@ def test_folder(folder: Path) -> list:
         mismatches = [tc for tc in all_cases if tc.is_mismatch]
 
         if all_match:
-            print(f"✅ PASSED ({n_tests} tests)")
             results.append((name, f"✅ PASSED ({n_tests} tests)", ""))
         else:
-            print(f"❌ FAILED ({len(mismatches)} mismatches)")
+            print(f"  [{folder.name}] {name} ... ❌ FAILED ({len(mismatches)} mismatches)")
             detail = "\n".join(tc.summary(show_trace=True) for tc in mismatches[:3])
             results.append((name, f"❌ FAILED ({len(mismatches)} mismatches)", detail))
 

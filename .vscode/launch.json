@@ -1,7 +1,19 @@
 {
     "configurations": [
         {
-            "name": "\u2705 Run Validation",
+            "name": "✅ Run Validation",
+            "type": "debugpy",
+            "request": "launch",
+            "noDebug": true,
+            "program": "${workspaceFolder}/src/language_preservation/run_validation.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": "${input:validationFolders}"
+        },
+        {
+            "name": "✅ Run Validation (debug)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/language_preservation/run_validation.py",
@@ -12,30 +24,33 @@
             "args": "${input:validationFolders}"
         },
         {
-            "name": "\ud83d\udd2c Equivalence Closure (Not Optimized)",
+            "name": "✅ Run Validation (Nested Calls)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/approaches/equivalence_closure/not_optimized/main.py",
+            "noDebug": true,
+            "program": "${workspaceFolder}/src/language_preservation/run_validation_nested_calls.py",
             "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}"
-            ]
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": "${input:validationFolders}"
         },
         {
-            "name": "\ud83d\udd2c Equivalence Closure (Optimized)",
+            "name": "✅ Run Validation (Nested Calls, debug)",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/code/approaches/equivalence_closure/optimized/main.py",
+            "program": "${workspaceFolder}/src/language_preservation/run_validation_nested_calls.py",
             "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}"
-            ]
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": "${input:validationFolders}"
         },
         {
-            "name": "\ud83d\udd2c Equivalence Closure (exclusive frontiers)",
+            "name": "🔬 Equivalence Closure",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/approaches/equivalence_closure/exclusive_frontiers/main.py",
+            "program": "${workspaceFolder}/src/approaches/equivalence_closure/main.py",
             "console": "integratedTerminal",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
@@ -45,10 +60,10 @@
             ]
         },
         {
-            "name": "\ud83d\udd2c No Equivalence Closure - Exclusive (Optimized + Fases Combined)",
+            "name": "🔬 No Equivalence Closure",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/approaches/no_equivalence_closure/exclusive_frontiers/optimized_fases_combined/main.py",
+            "program": "${workspaceFolder}/src/approaches/no_equivalence_closure/main.py",
             "console": "integratedTerminal",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
@@ -58,40 +73,7 @@
             ]
         },
         {
-            "name": "\ud83d\udd2c No Equivalence Closure - Exclusive (Optimized + Fases Separated)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/approaches/no_equivalence_closure/exclusive_frontiers/optimized_fases_separated/main.py",
-            "console": "integratedTerminal",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": [
-                "${input:inputFile}"
-            ]
-        },
-        {
-            "name": "\ud83d\udd2c No Equivalence Closure - Exclusive (Not Optimized)",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/code/approaches/no_equivalence_closure/exclusive_frontiers/not_optimized/main.py",
-            "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}"
-            ]
-        },
-        {
-            "name": "\ud83d\udd2c No Equivalence Closure - Hybrid Frontiers",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/code/approaches/no_equivalence_closure/hybrid_frontiers/main.py",
-            "console": "integratedTerminal",
-            "args": [
-                "${input:inputFile}"
-            ]
-        },
-        {
-            "name": "\ud83d\udcca Benchmark (beide varianten)",
+            "name": "📊 Benchmark (beide varianten)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/benchmark/benchmark.py",
@@ -101,7 +83,7 @@
             }
         },
         {
-            "name": "\ud83e\uddea Language Preservation - Single String",
+            "name": "🧪 Language Preservation - Single String",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/language_preservation/random_language_preservation.py",
@@ -116,7 +98,7 @@
             ]
         },
         {
-            "name": "\ud83e\uddea Language Preservation - Random",
+            "name": "🧪 Language Preservation - Random",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/language_preservation/random_language_preservation.py",
@@ -130,7 +112,7 @@
             ]
         },
         {
-            "name": "\ud83e\uddea Language Preservation - Targeted",
+            "name": "🧪 Language Preservation - Targeted",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/language_preservation/targeted_language_preservation.py",
@@ -144,7 +126,7 @@
             ]
         },
         {
-            "name": "\ud83e\uddea Language Preservation - Targeted (verbose)",
+            "name": "🧪 Language Preservation - Targeted (verbose)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/language_preservation/targeted_language_preservation.py",
@@ -159,7 +141,7 @@
             ]
         },
         {
-            "name": "\ud83e\uddea Language Preservation - Targeted (subset)",
+            "name": "🧪 Language Preservation - Targeted (subset)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/language_preservation/targeted_language_preservation.py",
@@ -175,7 +157,7 @@
             ]
         },
         {
-            "name": "\ud83e\uddea Language Preservation - Targeted (subset + verbose)",
+            "name": "🧪 Language Preservation - Targeted (subset + verbose)",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/language_preservation/targeted_language_preservation.py",
