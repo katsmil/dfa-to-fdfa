@@ -197,7 +197,7 @@
             "id": "validationFolders",
             "type": "promptString",
             "description": "Subfolders om te testen (spatie-gescheiden)",
-            "default": "joshua test_automata real_world"
+            "default": "miscellaneous test_automata real_world"
         },
         {
             "id": "inputFile",
@@ -214,8 +214,8 @@
         {
             "id": "lp_orig",
             "type": "promptString",
-            "description": "Original DOT file (bijv. input/joshua/differentEntries.dot)",
-            "default": "input/joshua/differentEntries.dot"
+            "description": "Original DOT file (bijv. input/miscellaneous/differentEntries.dot)",
+            "default": "input/miscellaneous/differentEntries.dot"
         },
         {
             "id": "lp_fact",

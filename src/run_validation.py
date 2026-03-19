@@ -5,7 +5,7 @@ Draait volledig in-process (geen subprocessen) zodat er geen timeout-issues zijn
 Gebruik:
   python3 run_validation.py                  → test alle subfolders van input/
   python3 run_validation.py test_automata    → alleen die subfolder(s)
-  python3 run_validation.py joshua real_world
+  python3 run_validation.py miscellaneous real_world
 """
 
 import sys
