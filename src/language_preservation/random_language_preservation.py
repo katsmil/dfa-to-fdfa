@@ -135,51 +135,6 @@ def verify_language_preservation(G_original: nx.MultiDiGraph, G_factored: nx.Mul
     return all_match, mismatches
 
 
-def compare_graphs_on_string(G_original: nx.MultiDiGraph, G_factored: nx.MultiDiGraph,
-                              input_string, verbose: bool = True) -> dict:
-    """
-    Compare two automata on a single input string.
-
-    Args:
-        G_original:   original DFA as a NetworkX MultiDiGraph
-        G_factored:   factored DFA as a NetworkX MultiDiGraph
-        input_string: string like 'axxa' or a list of symbols ['a','x','x','a']
-        verbose:      print traces and results
-
-    Returns:
-        dict with acceptance booleans and traces for both automata.
-    """
-    if isinstance(input_string, str):
-        symbols = input_string.split()
-    else:
-        symbols = []
-        for item in input_string:
-            symbols.extend(str(item).split())
-
-    exec_orig = DFAExecutor(G_original)
-    exec_fact = DFAExecutor(G_factored)
-
-    acc_orig, trace_orig = exec_orig.execute(symbols)
-    acc_fact, trace_fact = exec_fact.execute(symbols)
-
-    result = {
-        'string': ''.join(symbols),
-        'accepted_original': acc_orig,
-        'accepted_factored': acc_fact,
-        'trace_original': trace_orig,
-        'trace_factored': trace_fact,
-    }
-
-    if verbose:
-        print(f"String  : {result['string']}")
-        print(f"Original: {'ACCEPT' if acc_orig else 'REJECT'}")
-        print(result['trace_original'])
-        print(f"\nFactored: {'ACCEPT' if acc_fact else 'REJECT'}")
-        print(result['trace_factored'])
-
-    return result
-
-
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -187,18 +142,8 @@ def compare_graphs_on_string(G_original: nx.MultiDiGraph, G_factored: nx.MultiDi
 if __name__ == "__main__":
     import sys
 
-    # Usage: python language_preservation_random.py <orig.dot> <factored.dot> [string...]
-    if len(sys.argv) >= 4:
-        orig_path = sys.argv[1]
-        fact_path = sys.argv[2]
-        input_str = sys.argv[3:]
-
-        G_original = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(orig_path))
-        G_factored = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(fact_path))
-
-        compare_graphs_on_string(G_original, G_factored, input_str, verbose=True)
-
-    elif len(sys.argv) == 3:
+    # Usage: python language_preservation_random.py <orig.dot> <factored.dot>
+    if len(sys.argv) == 3:
         orig_path = sys.argv[1]
         fact_path = sys.argv[2]
 

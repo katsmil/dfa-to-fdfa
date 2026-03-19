@@ -150,7 +150,7 @@
             "name": "🧪 Language Preservation - Single String",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/language_preservation/random_language_preservation.py",
+            "program": "${workspaceFolder}/src/language_preservation/targeted_language_preservation.py",
             "console": "integratedTerminal",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
@@ -158,6 +158,7 @@
             "args": [
                 "${input:lp_orig}",
                 "${input:lp_fact}",
+                "--string",
                 "${input:lp_string}"
             ],
             "presentation": {
