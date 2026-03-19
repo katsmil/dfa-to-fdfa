@@ -283,19 +283,21 @@ def _is_valid_entry_structure(G: nx.MultiDiGraph,
 # FILTERING
 # ---------------------------------------------------------------------------
 
-def _build_dispatch_signatures(G: nx.MultiDiGraph) -> Dict[str, Dict[str, str]]:
+def _build_dispatch_signatures(G: nx.MultiDiGraph) -> Dict[str, Dict[str, Dict[str, str]]]:
     """
-    Bouw per node een 'dispatch signature': {symbol: target} over alle RC nodes
-    waarvan de dispatch_map deze node als frontier-key bevat.
+    Bouw per RC-node een geneste map: {label: {frontier_node: target}}.
 
-    Twee nodes die dezelfde canonicale positie in een subroutine innemen mogen
-    alleen samengevoegd worden als hun dispatch-signaturen identiek zijn.
-    Anders zou het samenvoegen informatie vernietigen in de dispatch_map van de
-    aanroepende RC node.
+    Dit wordt gebruikt in _filter_soft om te controleren of twee kandidaat-nodes
+    door DEZELFDE RC-node worden aangerefereerd met VERSCHILLENDE exit-targets voor
+    hetzelfde label. In dat geval zou samenvoeging de dispatch_map van die RC-node
+    beschadigen (twee frontier-keys worden één, maar de targets wijken af).
+
+    Nodes die uitsluitend door verschillende RC-nodes worden aangesproken zijn
+    veilig samen te voegen — elke outer RC-node behoudt zijn eigen dispatch-entry.
     """
     import ast as _ast
-    signatures: Dict[str, Dict[str, str]] = {}
-    for _, data in G.nodes(data=True):
+    rc_dispatch: Dict[str, Dict[str, Dict[str, str]]] = {}
+    for rc_node, data in G.nodes(data=True):
         dm = data.get('dispatch_map')
         if dm is None:
             continue
@@ -306,12 +308,12 @@ def _build_dispatch_signatures(G: nx.MultiDiGraph) -> Dict[str, Dict[str, str]]:
                 continue
         if not isinstance(dm, dict):
             continue
-        for sym, sub_to_target in dm.items():
+        rc_dispatch[rc_node] = {}
+        for label, sub_to_target in dm.items():
             if not isinstance(sub_to_target, dict):
                 continue
-            for frontier_node, target in sub_to_target.items():
-                signatures.setdefault(frontier_node, {})[sym] = target
-    return signatures
+            rc_dispatch[rc_node][label] = dict(sub_to_target)
+    return rc_dispatch
 
 
 def _filter_strict(G: nx.MultiDiGraph,
@@ -336,15 +338,17 @@ def _filter_soft(G: nx.MultiDiGraph,
                   sub: CanonicalSubstructure,
                   sub_mapping: Dict[str, str],
                   processed_nodes: Set[str],
-                  dispatch_signatures: Optional[Dict[str, Dict[str, str]]] = None) -> Tuple[List, bool]:
+                  dispatch_signatures: Optional[Dict[str, Dict[str, Dict[str, str]]]] = None) -> Tuple[List, bool]:
     """
     Zachte filter (NoEquivalenceClosure): ongeldige of overlappende locaties worden
     overgeslagen, de rest wordt geprobeerd.
 
     Extra check (dispatch_signatures): twee locaties mogen alleen samengevoegd worden
-    als voor elke canonicale positie de bijbehorende nodes identieke dispatch-signaturen
-    hebben in alle aanroepende RC nodes. Zo niet, dan zijn de nodes functioneel
-    onderscheidbaar en mag samenvoeging de dispatch_map van aanroepers niet beschadigen.
+    als er geen enkele RC-node bestaat die zowel ref_node als cand_node (op dezelfde
+    canonicale positie) als frontier-key heeft voor hetzelfde label met VERSCHILLENDE
+    targets. In dat geval raken de exit-paden van die RC-node verward na samenvoeging.
+    Nodes die door verschillende RC-nodes worden aangesproken zijn veilig samen te
+    voegen — elke outer RC-node behoudt zijn eigen dispatch-entry ongewijzigd.
     """
     valid = []
     nodes_in_batch: Set[str] = set()
@@ -358,19 +362,50 @@ def _filter_soft(G: nx.MultiDiGraph,
         if not _is_valid_entry_structure(G, loc.start_node, loc_nodes):
             continue
 
-        # Dispatch-signature check: elke node in deze locatie moet dezelfde
-        # dispatch-signature hebben als de corresponderende node in de eerste
-        # reeds geaccepteerde locatie (of de canonical nodes als er nog geen is).
+        # Dispatch-conflict check: zoek naar een RC-node die dezelfde dispatch-entry
+        # gebruikt voor zowel ref_node als cand_node (op dezelfde canonicale positie)
+        # met verschillende targets. Zo ja, dan zou samenvoeging die RC-node breken.
+        # Nodes die uitsluitend door *verschillende* RC-nodes worden aangesproken zijn
+        # altijd veilig samen te voegen.
         if dispatch_signatures is not None and valid:
             first_nodes = valid[0][0].all_nodes
             compatible = True
             for ref_node, cand_node in zip(first_nodes, loc.all_nodes):
-                ref_sig  = dispatch_signatures.get(ref_node,  {})
-                cand_sig = dispatch_signatures.get(cand_node, {})
-                if ref_sig != cand_sig:
-                    compatible = False
+                if ref_node == cand_node:
+                    continue
+                for rc_node_map in dispatch_signatures.values():
+                    for label, frontier_to_target in rc_node_map.items():
+                        ref_target  = frontier_to_target.get(ref_node)
+                        cand_target = frontier_to_target.get(cand_node)
+                        if ref_target is not None and cand_target is not None and ref_target != cand_target:
+                            compatible = False
+                            break
+                    if not compatible:
+                        break
+                if not compatible:
                     break
             if not compatible:
+                continue
+
+        # Intra-instance dispatch-conflict check: als een outer RC-node twee of meer
+        # nodes uit déze locatie als frontier-keys gebruikt voor hetzelfde label maar
+        # met VERSCHILLENDE targets, dan zou vervanging door één RC node die
+        # onderscheiding kwijtraken. Zo'n locatie moet worden overgeslagen.
+        if dispatch_signatures is not None:
+            intra_conflict = False
+            for rc_node_map in dispatch_signatures.values():
+                for label, frontier_to_target in rc_node_map.items():
+                    # Verzamel alle targets voor nodes in deze locatie
+                    targets_in_loc = {
+                        n: t for n, t in frontier_to_target.items()
+                        if n in loc_nodes
+                    }
+                    if len(set(targets_in_loc.values())) > 1:
+                        intra_conflict = True
+                        break
+                if intra_conflict:
+                    break
+            if intra_conflict:
                 continue
 
         valid.append((loc, _build_instance_mapping(loc, sub_mapping)))
@@ -385,7 +420,8 @@ def _filter_soft(G: nx.MultiDiGraph,
 
 def apply_factorization(G: nx.MultiDiGraph,
                          results: List[CanonicalSubstructure],
-                         strict_filter: bool = True) -> nx.MultiDiGraph:
+                         strict_filter: bool = True,
+                         check_dispatch_signatures: bool = True) -> nx.MultiDiGraph:
     processed_nodes: Set[str] = set()
     nodes_to_remove: Set[str] = set()
     replaced_by: Dict[str, str] = {}
@@ -395,9 +431,16 @@ def apply_factorization(G: nx.MultiDiGraph,
     _filter = _filter_strict if strict_filter else _filter_soft
 
     # Pre-compute dispatch signatures for the incompatibility check in _filter_soft.
-    # Only needed for the soft filter; computed once over the current graph state.
+    # Only needed for the soft filter; skipped when check_dispatch_signatures=False
+    # (second-run blueprint factorization: blueprint nodes from different subroutines
+    # legitimately have different dispatch signatures — their calling contexts differ —
+    # but that does NOT prevent safe factorization because _process_exits and
+    # _update_dispatch_maps handle per-instance dispatch correctly via
+    # frontier_key_replacements).
     dispatch_signatures: Optional[Dict[str, Dict[str, str]]] = (
-        _build_dispatch_signatures(G) if not strict_filter else None
+        _build_dispatch_signatures(G)
+        if not strict_filter and check_dispatch_signatures
+        else None
     )
 
     # Determine starting sub_id to avoid name collisions with SUB_ nodes

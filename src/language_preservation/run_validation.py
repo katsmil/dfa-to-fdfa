@@ -66,7 +66,7 @@ def test_folder(folder: Path) -> list:
     results = []
     for dot_file in dot_files:
         name = dot_file.stem
-        output_dot = OUTPUT_DIR / f"{name}_COMBINED.dot"
+        output_dot = OUTPUT_DIR / f"{name}_NoEqClosure.dot"
         # Stap 1: factorizeer
         try:
             G_orig = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(str(dot_file)))

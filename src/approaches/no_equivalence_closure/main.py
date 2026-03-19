@@ -1,10 +1,9 @@
 import sys
 import networkx as nx
 from pathlib import Path
-from analyze import run_analysis
+from approaches.no_equivalence_closure.analyze import run_analysis
 from approaches.shared.factorize import apply_factorization, save_dot
 from approaches.shared.shared_types import MatchLocation, CanonicalSubstructure
-# from factorize import apply_factorization, save_dot
 
 
 def _recompute_frontiers(results, G_full):
@@ -19,7 +18,7 @@ def _recompute_frontiers(results, G_full):
     Voor geval 1: geen externe edges → frontier leeg → dispatch_map leeg →
                   executor handelt het af via transparant doorborrelen.
     Voor geval 2: externe edge aanwezig in G_full → frontier correct gedetecteerd →
-                  _process_exits vult dispatch_map met de juiste interne vervolg-node.
+                  _process_exits vult dispatch_map met de juiste interne vervolgnode.
     """
     patched = []
     for sub in results:
@@ -52,24 +51,24 @@ def main():
     if len(sys.argv) < 2:
         print("Gebruik: python main.py <graph.dot>")
         sys.exit(1)
-    
+
     input_file = sys.argv[1]
-    
+
     # 1. Inlezen (Gebruik MultiDiGraph voor behoud van alle transities)
     try:
         G_orig = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(input_file))
     except Exception as e:
         print(f"Fout bij inlezen bestand: {e}")
         sys.exit(1)
-    
+
     # 2. Analyse van substructuren
     results = run_analysis(G_orig)
-    
+
     if not results:
         print("Geen factorisatie mogelijk.")
     else:
         print(f"Gevonden structuren: {len(results)}")
-    
+
     # 3. Eerste run: factoriseer de originele graaf
     G_factorized = apply_factorization(G_orig, results, strict_filter=False)
 
@@ -81,7 +80,8 @@ def main():
         if results2:
             results2 = _recompute_frontiers(results2, G_factorized)
             print(f"  Tweede run: {len(results2)} gemeenschappelijke structuur(en) gevonden in subroutines")
-            G_factorized = apply_factorization(G_factorized, results2, strict_filter=False)
+            G_factorized = apply_factorization(G_factorized, results2, strict_filter=False,
+                                               check_dispatch_signatures=False)
         else:
             print("  Tweede run: geen gemeenschappelijke structuren gevonden in subroutines")
 
@@ -89,7 +89,7 @@ def main():
     output_folder = Path("output")
     output_folder.mkdir(parents=True, exist_ok=True)
     input_path = Path(input_file)
-    output_dot = output_folder / (input_path.stem + "_COMBINED.dot")
+    output_dot = output_folder / (input_path.stem + "_NoEqClosure_Nested.dot")
     save_dot(G_factorized, str(output_dot))
 
 if __name__ == "__main__":
