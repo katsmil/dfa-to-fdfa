@@ -344,31 +344,6 @@ def _filter_locations(G: nx.MultiDiGraph,
         if not _is_valid_entry_structure(G, loc.start_node, loc_nodes):
             continue
 
-        # Dispatch-conflict check: zoek naar een RC-node die dezelfde dispatch-entry
-        # gebruikt voor zowel ref_node als cand_node (op dezelfde canonicale positie)
-        # met verschillende targets. Zo ja, dan zou samenvoeging die RC-node breken.
-        # Nodes die uitsluitend door *verschillende* RC-nodes worden aangesproken zijn
-        # altijd veilig samen te voegen.
-        if dispatch_signatures is not None and valid:
-            first_nodes = valid[0][0].all_nodes
-            compatible = True
-            for ref_node, cand_node in zip(first_nodes, loc.all_nodes):
-                if ref_node == cand_node:
-                    continue
-                for rc_node_map in dispatch_signatures.values():
-                    for label, frontier_to_target in rc_node_map.items():
-                        ref_target  = frontier_to_target.get(ref_node)
-                        cand_target = frontier_to_target.get(cand_node)
-                        if ref_target is not None and cand_target is not None and ref_target != cand_target:
-                            compatible = False
-                            break
-                    if not compatible:
-                        break
-                if not compatible:
-                    break
-            if not compatible:
-                continue
-
         # Intra-instance dispatch-conflict check: als een outer RC-node twee of meer
         # nodes uit déze locatie als frontier-keys gebruikt voor hetzelfde label maar
         # met VERSCHILLENDE targets, dan zou vervanging door één RC node die
