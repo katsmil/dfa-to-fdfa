@@ -1,7 +1,7 @@
 {
     "configurations": [
         {
-            "name": "✅ Run Validation",
+            "name": "▶ Validate",
             "type": "debugpy",
             "request": "launch",
             "noDebug": true,
@@ -17,7 +17,7 @@
             }
         },
         {
-            "name": "✅ Run Validation (debug)",
+            "name": "🐛 Validate",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/language_preservation/run_validation.py",
@@ -32,7 +32,7 @@
             }
         },
         {
-            "name": "✅ Run Validation (Nested Calls)",
+            "name": "🔄 Validate — Nested Calls",
             "type": "debugpy",
             "request": "launch",
             "noDebug": true,
@@ -48,7 +48,7 @@
             }
         },
         {
-            "name": "✅ Run Validation (Nested Calls, debug)",
+            "name": "🐛 Validate — Nested Calls",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/language_preservation/run_validation_nested_calls.py",
