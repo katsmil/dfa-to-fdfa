@@ -10,7 +10,11 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": "${input:validationFolders}"
+            "args": "${input:validationFolders}",
+            "presentation": {
+                "group": "1_validation",
+                "order": 1
+            }
         },
         {
             "name": "✅ Run Validation (debug)",
@@ -21,7 +25,11 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": "${input:validationFolders}"
+            "args": "${input:validationFolders}",
+            "presentation": {
+                "group": "1_validation",
+                "order": 2
+            }
         },
         {
             "name": "✅ Run Validation (Nested Calls)",
@@ -33,7 +41,11 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": "${input:validationFolders}"
+            "args": "${input:validationFolders}",
+            "presentation": {
+                "group": "1_validation",
+                "order": 3
+            }
         },
         {
             "name": "✅ Run Validation (Nested Calls, debug)",
@@ -44,7 +56,11 @@
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
             },
-            "args": "${input:validationFolders}"
+            "args": "${input:validationFolders}",
+            "presentation": {
+                "group": "1_validation",
+                "order": 4
+            }
         },
         {
             "name": "🔬 Equivalence Closure",
@@ -57,7 +73,29 @@
             },
             "args": [
                 "${input:inputFile}"
-            ]
+            ],
+            "presentation": {
+                "group": "2_approaches",
+                "order": 1
+            }
+        },
+        {
+            "name": "🔬 Equivalence Closure (no debug)",
+            "type": "debugpy",
+            "request": "launch",
+            "noDebug": true,
+            "program": "${workspaceFolder}/src/approaches/equivalence_closure/main.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [
+                "${input:inputFile}"
+            ],
+            "presentation": {
+                "group": "2_approaches",
+                "order": 2
+            }
         },
         {
             "name": "🔬 No Equivalence Closure",
@@ -70,7 +108,29 @@
             },
             "args": [
                 "${input:inputFile}"
-            ]
+            ],
+            "presentation": {
+                "group": "2_approaches",
+                "order": 3
+            }
+        },
+        {
+            "name": "🔬 No Equivalence Closure (no debug)",
+            "type": "debugpy",
+            "request": "launch",
+            "noDebug": true,
+            "program": "${workspaceFolder}/src/approaches/no_equivalence_closure/main.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "args": [
+                "${input:inputFile}"
+            ],
+            "presentation": {
+                "group": "2_approaches",
+                "order": 4
+            }
         },
         {
             "name": "📊 Benchmark (beide varianten)",
@@ -80,6 +140,10 @@
             "console": "integratedTerminal",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "presentation": {
+                "group": "2_approaches",
+                "order": 5
             }
         },
         {
@@ -95,7 +159,11 @@
                 "${input:lp_orig}",
                 "${input:lp_fact}",
                 "${input:lp_string}"
-            ]
+            ],
+            "presentation": {
+                "group": "3_language_preservation",
+                "order": 1
+            }
         },
         {
             "name": "🧪 Language Preservation - Random",
@@ -109,7 +177,11 @@
             "args": [
                 "${input:lp_orig}",
                 "${input:lp_fact}"
-            ]
+            ],
+            "presentation": {
+                "group": "3_language_preservation",
+                "order": 2
+            }
         },
         {
             "name": "🧪 Language Preservation - Targeted",
@@ -123,7 +195,11 @@
             "args": [
                 "${input:lp_orig}",
                 "${input:lp_fact}"
-            ]
+            ],
+            "presentation": {
+                "group": "3_language_preservation",
+                "order": 3
+            }
         },
         {
             "name": "🧪 Language Preservation - Targeted (verbose)",
@@ -138,7 +214,11 @@
                 "${input:lp_orig}",
                 "${input:lp_fact}",
                 "--verbose"
-            ]
+            ],
+            "presentation": {
+                "group": "3_language_preservation",
+                "order": 4
+            }
         },
         {
             "name": "🧪 Language Preservation - Targeted (subset)",
@@ -154,7 +234,11 @@
                 "${input:lp_fact}",
                 "--states",
                 "${input:lp_states}"
-            ]
+            ],
+            "presentation": {
+                "group": "3_language_preservation",
+                "order": 5
+            }
         },
         {
             "name": "🧪 Language Preservation - Targeted (subset + verbose)",
@@ -171,7 +255,11 @@
                 "--states",
                 "${input:lp_states}",
                 "--verbose"
-            ]
+            ],
+            "presentation": {
+                "group": "3_language_preservation",
+                "order": 6
+            }
         }
     ],
     "inputs": [
