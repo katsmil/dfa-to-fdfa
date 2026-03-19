@@ -32,37 +32,6 @@
             }
         },
         {
-            "name": "🔄 Validate — Nested Calls",
-            "type": "debugpy",
-            "request": "launch",
-            "noDebug": true,
-            "program": "${workspaceFolder}/src/language_preservation/run_validation_nested_calls.py",
-            "console": "integratedTerminal",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": "${input:validationFolders}",
-            "presentation": {
-                "group": "1_validation",
-                "order": 3
-            }
-        },
-        {
-            "name": "🐛 Validate — Nested Calls",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/src/language_preservation/run_validation_nested_calls.py",
-            "console": "integratedTerminal",
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
-            },
-            "args": "${input:validationFolders}",
-            "presentation": {
-                "group": "1_validation",
-                "order": 4
-            }
-        },
-        {
             "name": "🔬 Equivalence Closure",
             "type": "debugpy",
             "request": "launch",
