@@ -18,7 +18,7 @@ from pathlib import Path
 SRC        = Path(__file__).parent.parent          # src/
 INPUT_ROOT = SRC.parent / "input"
 OUTPUT_DIR = SRC / "output"
-ANALYZE_DIR = SRC / "approaches/no_equivalence_closure/exclusive_frontiers/optimized_fases_combined"
+ANALYZE_DIR = SRC / "approaches/no_equivalence_closure"
 
 for p in [str(SRC), str(ANALYZE_DIR), str(SRC / "language_preservation")]:
     if p not in sys.path:
