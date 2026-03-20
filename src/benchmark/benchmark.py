@@ -49,12 +49,12 @@ def load_variant_module(variant: str, module_name: str, analyze_module=None):
     if variant == 'NoEquivalenceClosure':
         module_path = os.path.join(
             project_root, "approaches", "no_equivalence_closure", 
-            "exclusive_frontiers", "optimized_fases_combined", f"{module_name}.py"
+            f"{module_name}.py"
         )
     else:  # EquivalenceClosure
         module_path = os.path.join(
             project_root, "approaches", "equivalence_closure", 
-            "exclusive_frontiers", f"{module_name}.py"
+            f"{module_name}.py"
         )
     module_name_unique = f"{variant}_{module_name}"
     spec = importlib.util.spec_from_file_location(module_name_unique, module_path)
@@ -144,9 +144,7 @@ class BenchmarkSuite:
             # Gebruik altijd de gedeelde factorize
             factored_graph = shared_factorize.apply_factorization(
                 graph.copy(),
-                structures,
-                # strict_filter=(variant == 'EquivalenceClosure')
-                strict_filter=False
+                structures
             )
         except Exception as e:
             print(f"\n❌ Error loading factorize module for {variant}:")
@@ -372,20 +370,20 @@ if __name__ == "__main__":
     # TEST CONFIGURATIONS - KIES HIERONDER
     # ============================================
     # Wijzig TEST_MODE om te switchen tussen test scenarios:
-    # - 'joshua'           : Kleine, snelle testen (joshua voorbeelden)
+    # - 'miscellaneous'    : Kleine, snelle testen (miscellaneous voorbeelden)
     # - 'real_world'           : Grotere real-world voorbeelden (url_parser, etc.)
     # - 'test_automata'   : Alle deel_*.dot files uit input/test_automata/
     # - 'custom'          : Aangepaste list - voeg je eigen testen toe
     TEST_MODE = 'real_world'  # ← WIJZIG DEZE LIJN
     
-    if TEST_MODE == 'joshua':
+    if TEST_MODE == 'miscellaneous':
         # Kleine testcases voor snelle feedback
         test_configs = [
-            ("bigSmall", "/Users/milcokats/Projects/Compression Cyclic DFA/input/joshua/bigSmall.dot"),
-            ("differentEntries", "/Users/milcokats/Projects/Compression Cyclic DFA/input/joshua/differentEntries.dot"),
-            ("fourComponents", "/Users/milcokats/Projects/Compression Cyclic DFA/input/joshua/fourComponents.dot"),
-            ("multipleExits2", "/Users/milcokats/Projects/Compression Cyclic DFA/input/joshua/multipleExits2.dot"),
-            ("commonState", "/Users/milcokats/Projects/Compression Cyclic DFA/input/joshua/commonState.dot")
+            ("bigSmall", "/Users/milcokats/Projects/Compression Cyclic DFA/input/miscellaneous/bigSmall.dot"),
+            ("differentEntries", "/Users/milcokats/Projects/Compression Cyclic DFA/input/miscellaneous/differentEntries.dot"),
+            ("fourComponents", "/Users/milcokats/Projects/Compression Cyclic DFA/input/miscellaneous/fourComponents.dot"),
+            ("multipleExits2", "/Users/milcokats/Projects/Compression Cyclic DFA/input/miscellaneous/multipleExits2.dot"),
+            ("commonState", "/Users/milcokats/Projects/Compression Cyclic DFA/input/miscellaneous/commonState.dot")
         ]
         print("📊 Mode: QUICK (kleine testcases)")
         
@@ -411,7 +409,7 @@ if __name__ == "__main__":
     elif TEST_MODE == 'custom':
         # Zelf je combinatie samenstellen
         test_configs = [
-            ("bigSmall", "/Users/milcokats/Projects/Compression Cyclic DFA/input/joshua/bigSmall.dot"),
+            ("bigSmall", "/Users/milcokats/Projects/Compression Cyclic DFA/input/miscellaneous/bigSmall.dot"),
             ("url_parser", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world_examples/url_parser.dot"),
             # Voeg je test cases hier toe
         ]

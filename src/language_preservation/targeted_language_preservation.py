@@ -142,6 +142,10 @@ def _find_suffix_to_reject(node: str,
         # Node itself is already rejecting
         return []
 
+    # Bereken het volledige alfabet eenmalig buiten de BFS-lus.
+    # (Niet per iteratie herberekenen — dat is O(states * transitions) per stap.)
+    all_syms = set(sym for trans in table.values() for sym in trans.keys())
+
     visited: Dict[str, List[str]] = {node: []}
     queue: deque = deque([node])
 
@@ -150,7 +154,6 @@ def _find_suffix_to_reject(node: str,
 
         # Try a symbol for which no transition is defined → immediate reject
         defined_syms = set(table.get(cur, {}).keys())
-        all_syms = set(sym for trans in table.values() for sym in trans.keys())
         dead_syms = all_syms - defined_syms
         if dead_syms:
             return visited[cur] + [sorted(dead_syms)[0]]
@@ -424,6 +427,51 @@ def verify_language_preservation_targeted(
     return tester.run()
 
 
+def compare_graphs_on_string(G_original: nx.MultiDiGraph, G_factored: nx.MultiDiGraph,
+                             input_string, verbose: bool = True) -> dict:
+    """
+    Compare two automata on a single input string.
+
+    Args:
+        G_original:   original DFA as a NetworkX MultiDiGraph
+        G_factored:   factored DFA as a NetworkX MultiDiGraph
+        input_string: string like 'axxa' or a list of symbols ['a','x','x','a']
+        verbose:      print traces and results
+
+    Returns:
+        dict with acceptance booleans and traces for both automata.
+    """
+    if isinstance(input_string, str):
+        symbols = input_string.split()
+    else:
+        symbols = []
+        for item in input_string:
+            symbols.extend(str(item).split())
+
+    exec_orig = DFAExecutor(G_original)
+    exec_fact = DFAExecutor(G_factored)
+
+    acc_orig, trace_orig = exec_orig.execute(symbols)
+    acc_fact, trace_fact = exec_fact.execute(symbols)
+
+    result = {
+        'string': ''.join(symbols),
+        'accepted_original': acc_orig,
+        'accepted_factored': acc_fact,
+        'trace_original': trace_orig,
+        'trace_factored': trace_fact,
+    }
+
+    if verbose:
+        print(f"String  : {result['string']}")
+        print(f"Original: {'ACCEPT' if acc_orig else 'REJECT'}")
+        print(result['trace_original'])
+        print(f"\nFactored: {'ACCEPT' if acc_fact else 'REJECT'}")
+        print(result['trace_factored'])
+
+    return result
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -431,26 +479,33 @@ def verify_language_preservation_targeted(
 if __name__ == "__main__":
     import sys
 
-    # Usage: python targeted_language_preservation.py <orig.dot> <factored.dot> [-v] [--states q0,q3,q7]
+    # Usage: python targeted_language_preservation.py <orig.dot> <factored.dot> [--string axxa] [-v] [--states q0,q3,q7]
     if len(sys.argv) >= 3:
         orig_path = sys.argv[1]
         fact_path = sys.argv[2]
         verbose = '-v' in sys.argv or '--verbose' in sys.argv
 
-        # Parse optional --states q0,q3,q7
-        states = None
-        if '--states' in sys.argv:
-            idx = sys.argv.index('--states')
-            if idx + 1 < len(sys.argv):
-                states = set(s.strip() for s in sys.argv[idx + 1].split(',') if s.strip())
-
         G_original = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(orig_path))
         G_factored = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(fact_path))
 
-        tester = TargetedLanguagePreservationTester(G_original, G_factored)
-        report, all_cases = tester.run_report(verbose=verbose, states=states)
-        print(report)
-        tester.write_json(orig_path, fact_path, all_cases)
+        if '--string' in sys.argv:
+            # Single string comparison mode
+            idx = sys.argv.index('--string')
+            if idx + 1 < len(sys.argv):
+                input_str = sys.argv[idx + 1].split()
+                compare_graphs_on_string(G_original, G_factored, input_str, verbose=True)
+        else:
+            # Targeted testing mode
+            states = None
+            if '--states' in sys.argv:
+                idx = sys.argv.index('--states')
+                if idx + 1 < len(sys.argv):
+                    states = set(s.strip() for s in sys.argv[idx + 1].split(',') if s.strip())
+
+            tester = TargetedLanguagePreservationTester(G_original, G_factored)
+            report, all_cases = tester.run_report(verbose=verbose, states=states)
+            print(report)
+            tester.write_json(orig_path, fact_path, all_cases)
 
     else:
         # Fallback for local testing
