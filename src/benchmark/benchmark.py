@@ -322,7 +322,7 @@ if __name__ == "__main__":
     elif TEST_MODE == 'real_world':
         # Grotere real-world voorbeelden
         test_configs = [
-            # ("url-parser", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world_examples/url-parser.dot"),
+            ("url-parser", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/url-parser.dot"),
             ("url-53", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/url-53-reduced-percent.dot"),
             ("url-170", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/url-170-reduced-https.dot"),
             ("url-271", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/url-271-reduced-ipv6-noslash.dot"),
