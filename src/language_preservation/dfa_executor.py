@@ -61,7 +61,8 @@ class DFAExecutor:
         self.G = self._normalize_node_attributes(self.G)
         self.start_node = self._find_start_node()
         self.start_node = self._follow_epsilon_transitions(self.start_node)
-        self.accepting_nodes = self._find_accepting_nodes()
+        self.accepting_nodes = self._find_accepting_nodes()   # input-accepting states
+        self.frontier_nodes = self._find_frontier_nodes()     # control-flow return points
 
     # ------------------------------------------------------------------
     # Initialization helpers
@@ -98,8 +99,54 @@ class DFAExecutor:
         return find_start_node(self.G)
 
     def _find_accepting_nodes(self) -> Set[str]:
-        """Find accepting states (doublecircle shape or peripheries=2)."""
-        return find_accepting_nodes(self.G)
+        """
+        Nodes where execution terminates and the input is accepted.
+
+        - Outside subroutines: doublecircle or peripheries=2 (original DFA convention).
+        - Inside subroutines (SUB_* / cluster 'subroutine_*'): only if
+          originally_accepting=True.  A bare peripheries=2 inside a subroutine
+          signals a frontier (control-flow return point), NOT input acceptance.
+        """
+        accepting = set()
+        for node in self.G.nodes():
+            nd = self.G.nodes[node]
+            in_subroutine = (
+                'subroutine' in str(nd.get('cluster', ''))
+                or 'SUB_' in str(node)
+            )
+            if in_subroutine:
+                originally = str(nd.get('originally_accepting', '')).strip().strip('"').strip("'").lower()
+                if originally == 'true':
+                    accepting.add(node)
+            else:
+                shape = str(nd.get('shape', '')).strip().strip('"').strip("'")
+                peripheries = str(nd.get('peripheries', '')).strip().strip('"').strip("'")
+                if shape == 'doublecircle' or peripheries == '2':
+                    accepting.add(node)
+        return accepting
+
+    def _find_frontier_nodes(self) -> Set[str]:
+        """
+        Nodes that can return control flow to their RC caller.
+
+        A frontier is a subroutine-context node (SUB_* / cluster 'subroutine_*')
+        marked peripheries=2 by _process_exits.  Nested RC nodes that inherited
+        peripheries=2 from a replaced instance node are included via their
+        cluster attribute.
+        """
+        frontier = set()
+        for node in self.G.nodes():
+            nd = self.G.nodes[node]
+            peripheries = str(nd.get('peripheries', '')).strip().strip('"').strip("'")
+            if peripheries != '2':
+                continue
+            in_subroutine = (
+                'subroutine' in str(nd.get('cluster', ''))
+                or 'SUB_' in str(node)
+            )
+            if in_subroutine:
+                frontier.add(node)
+        return frontier
 
     # ------------------------------------------------------------------
     # Execution
@@ -178,18 +225,7 @@ class DFAExecutor:
 
         current = self._follow_epsilon_to_accepting(current)
 
-        accepted = False
-        if current in self.accepting_nodes:
-            nd = self.G.nodes.get(current, {})
-            cluster = nd.get('cluster')
-            if isinstance(cluster, str) and 'subroutine' in cluster:
-                # Inside a subroutine: only accept if this node was originally
-                # an accepting state in the unfactored DFA.
-                originally = str(nd.get('originally_accepting', 'False')).strip().strip('"').strip("'")
-                if originally == 'True':
-                    accepted = True
-            else:
-                accepted = True
+        accepted = current in self.accepting_nodes
         trace.append(f"\nFinal: {current} ({'ACCEPT' if accepted else 'REJECT'})")
 
         return accepted, "\n".join(trace)
@@ -248,10 +284,7 @@ class DFAExecutor:
         return None
 
     def _is_frontier(self, node: str) -> bool:
-        if node not in self.accepting_nodes:
-            return False
-        nd = self.G.nodes.get(node, {})
-        return 'subroutine' in str(nd.get('cluster', '')) or 'SUB_' in str(node)
+        return node in self.frontier_nodes
 
     def _follow_epsilon_to_accepting(self, node: str) -> str:
         """Follow epsilon transitions until an accepting node is reached."""
