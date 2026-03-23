@@ -14,56 +14,25 @@ import json
 import sys
 import os
 
-from approaches.shared import factorize as shared_factorize
-
-# CRITICAL FIX: Add project root to Python path
-# This must happen BEFORE any custom imports
+# Add project root to Python path so imports work correctly
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)  # Should be .../src/
-# Ensure project root is importable so we can `import language_preservation...`
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# Also add the language_preservation directory so that
-# targeted_language_preservation.py can find dfa_executor.py via direct import
 language_preservation_dir = os.path.join(project_root, "language_preservation")
 if language_preservation_dir not in sys.path:
     sys.path.insert(0, language_preservation_dir)
 
-# Setup variant module loaders
-def load_variant_module(variant: str, module_name: str, analyze_module=None):
-    """
-    Laad dynamisch een analyze/factorize module voor een variant.
-    Dit vermijdt relative import problemen door modules in sys.modules in te spuiten.
-    
-    Args:
-        variant: 'NoEquivalenceClosure' or 'EquivalenceClosure'
-        module_name: 'analyze' or 'factorize'
-        analyze_module: (optional) Al geladen analyze module (nodig voor factorize)
-    """
-    if module_name == 'factorize':
-        # Altijd de gedeelde factorize gebruiken
-        return shared_factorize
-    # Voor analyze blijft variant-specifiek
-    import importlib.util
-    if variant == 'NoEquivalenceClosure':
-        module_path = os.path.join(
-            project_root, "approaches", "no_equivalence_closure", 
-            f"{module_name}.py"
-        )
-    else:  # EquivalenceClosure
-        module_path = os.path.join(
-            project_root, "approaches", "equivalence_closure", 
-            f"{module_name}.py"
-        )
-    module_name_unique = f"{variant}_{module_name}"
-    spec = importlib.util.spec_from_file_location(module_name_unique, module_path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name_unique] = module
-    if module_name == 'factorize' and analyze_module is not None:
-        sys.modules['analyze'] = analyze_module
-    spec.loader.exec_module(module)
-    return module
+from approaches.no_equivalence_closure.main import factorize as _factorize_no_eq
+from approaches.equivalence_closure.main import factorize as _factorize_eq
+from approaches.no_equivalence_closure_nested_calls.main import factorize as _factorize_nested
+
+VARIANT_FACTORIZE = {
+    'NoEquivalenceClosure': _factorize_no_eq,
+    'EquivalenceClosure':   _factorize_eq,
+    'NestedCalls':          _factorize_nested,
+}
 
 def count_real_nodes(G: nx.MultiDiGraph) -> int:
     """Tel aantal nodes, exclusief dummy start nodes (__start_*)."""
@@ -81,13 +50,9 @@ def count_real_edges(G: nx.MultiDiGraph) -> int:
 class BenchmarkResult:
     """Metrics die voor beide varianten gemeten worden"""
     # Timing
-    analysis_time: float
-    factorization_time: float
     total_time: float
     
     # Effectiviteit
-    structures_found: int
-    # total_locations: int
     nodes_before: int
     nodes_after: int
     edges_before: int
@@ -95,10 +60,7 @@ class BenchmarkResult:
     
     # Kwaliteit
     compression_ratio: float  # nodes_after / nodes_before
-    largest_structure_size: int
-    avg_structure_size: float
-    # effective_count_sum: int  # Som van alle effective_counts
-    
+
     # Correctheid
     language_preserved: bool  # Via random walk testing
     determinism_check: bool   # Geen duplicate labels op RC nodes
@@ -114,7 +76,8 @@ class BenchmarkSuite:
     def __init__(self):
         self.results = {
             'NoEquivalenceClosure': [],
-            'EquivalenceClosure': []
+            'EquivalenceClosure': [],
+            'NestedCalls': []
         }
     
     def run_benchmark(self, graph: nx.MultiDiGraph, name: str, variant: str):
@@ -125,67 +88,27 @@ class BenchmarkSuite:
         # PRE-METRICS (exclusief dummy nodes)
         nodes_before = count_real_nodes(graph)
         edges_before = count_real_edges(graph)
-        
-        # ANALYSIS PHASE
-        start_analysis = time.time()
-        try:
-            analyze_module = load_variant_module(variant, 'analyze')
-            structures = analyze_module.run_analysis(graph.copy(), min_size=2)
-        except Exception as e:
-            print(f"\n❌ Error loading analyze module for {variant}:")
-            print(f"   {e}")
-            raise
-            
-        analysis_time = time.time() - start_analysis
-        
-        # FACTORIZATION PHASE
-        start_fact = time.time()
-        try:
-            # Gebruik altijd de gedeelde factorize
-            factored_graph = shared_factorize.apply_factorization(
-                graph.copy(),
-                structures
-            )
-        except Exception as e:
-            print(f"\n❌ Error loading factorize module for {variant}:")
-            print(f"   {e}")
-            raise
-        factorization_time = time.time() - start_fact
-        
+
+        factorize_fn = VARIANT_FACTORIZE[variant]
+        factored_graph = factorize_fn(graph.copy())
+
         total_time = time.time() - start_total
         
         # POST-METRICS (exclusief dummy nodes)
         nodes_after = count_real_nodes(factored_graph)
         edges_after = count_real_edges(factored_graph)
         
-        # KWALITEITSMETRICS
-        if structures:
-            largest = max(s.overlap_size for s in structures)
-            avg_size = sum(s.overlap_size for s in structures) / len(structures)
-            # effective_sum = sum(s.effective_count for s in structures)
-        else:
-            largest = 0
-            avg_size = 0
-            # effective_sum = 0
-        
         # CORRECTHEIDSCHECK (zie functie hieronder)
         language_ok, mismatches = self.verify_language_preservation(graph, factored_graph)
         determinism_ok = self.verify_determinism(factored_graph)
         
         result = BenchmarkResult(
-            analysis_time=analysis_time,
-            factorization_time=factorization_time,
             total_time=total_time,
-            structures_found=len(structures),
-            # total_locations=sum(len(s.locations) for s in structures),
             nodes_before=nodes_before,
             nodes_after=nodes_after,
             edges_before=edges_before,
             edges_after=edges_after,
             compression_ratio=1.0 - (nodes_after / nodes_before) if nodes_before > 0 else 0.0,
-            largest_structure_size=largest,
-            avg_structure_size=avg_size,
-            # effective_count_sum=effective_sum,
             language_preserved=language_ok,
             language_mismatches=mismatches,
             determinism_check=determinism_ok
@@ -249,40 +172,45 @@ class BenchmarkSuite:
         return True
     
     def generate_comparison_report(self) -> str:
-        """Maak een vergelijkingsrapport tussen beide varianten"""
+        """Maak een vergelijkingsrapport tussen alle drie de varianten"""
         report = []
         report.append("=" * 80)
-        report.append("BENCHMARK COMPARISON: EquivalenceClosure vs NoEquivalenceClosure")
+        report.append("BENCHMARK COMPARISON: NoEquivalenceClosure vs EquivalenceClosure vs NestedCalls")
         report.append("=" * 80)
-        
+
+        has_nested = bool(self.results['NestedCalls'])
+
         # Per testcase vergelijken
         for i, test_name in enumerate([r['graph_name'] for r in self.results['NoEquivalenceClosure']]):
             no_eq = self.results['NoEquivalenceClosure'][i]['result']
             eq = self.results['EquivalenceClosure'][i]['result']
-            
+            nested = self.results['NestedCalls'][i]['result'] if has_nested and i < len(self.results['NestedCalls']) else None
+
             report.append(f"\n📊 Test: {test_name}")
             report.append("-" * 80)
-            
+
             # SNELHEID
             report.append(f"\n⏱️  PERFORMANCE:")
-            report.append(f"  NoEquiv:  {no_eq.total_time:.3f}s (analysis: {no_eq.analysis_time:.3f}s)")
-            report.append(f"  Equiv:    {eq.total_time:.3f}s (analysis: {eq.analysis_time:.3f}s)")
+            report.append(f"  NoEquiv:  {no_eq.total_time:.3f}s")
+            report.append(f"  Equiv:    {eq.total_time:.3f}s")
+            if nested:
+                report.append(f"  Nested:   {nested.total_time:.3f}s")
             speedup = no_eq.total_time / eq.total_time if eq.total_time > 0 else 0
-            report.append(f"  → Speedup: {speedup:.2f}x {'🚀' if speedup > 1 else ''}")
-            
+            report.append(f"  → Speedup (NoEquiv/Equiv): {speedup:.2f}x {'🚀' if speedup > 1 else ''}")
+
             # EFFECTIVITEIT
             report.append(f"\n📦 COMPRESSION:")
             report.append(f"  NoEquiv:  {no_eq.nodes_before} → {no_eq.nodes_after} nodes ({no_eq.compression_ratio:.1%})")
             report.append(f"  Equiv:    {eq.nodes_before} → {eq.nodes_after} nodes ({eq.compression_ratio:.1%})")
-            
-            better_compression = "NoEquiv" if no_eq.compression_ratio > eq.compression_ratio else "Equiv"
-            report.append(f"  → Better compression: {better_compression}")
-            
-            # # KWALITEIT
-            # report.append(f"\n🎯 QUALITY:")
-            # report.append(f"  NoEquiv:  {no_eq.structures_found} structures, {no_eq.total_locations} locations")
-            # report.append(f"  Equiv:    {eq.structures_found} structures, {eq.total_locations} locations")
-            
+            if nested:
+                report.append(f"  Nested:   {nested.nodes_before} → {nested.nodes_after} nodes ({nested.compression_ratio:.1%})")
+
+            ratios = {'NoEquiv': no_eq.compression_ratio, 'Equiv': eq.compression_ratio}
+            if nested:
+                ratios['Nested'] = nested.compression_ratio
+            best = max(ratios, key=ratios.get)
+            report.append(f"  → Best compression: {best}")
+
             # CORRECTHEID
             report.append(f"\n✅ CORRECTNESS:")
             report.append(f"  NoEquiv:  Language OK: {no_eq.language_preserved}, Determinism: {no_eq.determinism_check}")
@@ -296,7 +224,14 @@ class BenchmarkSuite:
                 report.append(f"    → Mismatches (sample up to 2):")
                 for m in eq.language_mismatches[:2]:
                     report.append(f"      - {m.splitlines()[3] if '\n' in m else m}")
-        
+
+            if nested:
+                report.append(f"  Nested:   Language OK: {nested.language_preserved}, Determinism: {nested.determinism_check}")
+                if not nested.language_preserved and nested.language_mismatches:
+                    report.append(f"    → Mismatches (sample up to 2):")
+                    for m in nested.language_mismatches[:2]:
+                        report.append(f"      - {m.splitlines()[3] if '\n' in m else m}")
+
         return "\n".join(report)
     
     def save_results(self, filename: str = "benchmark_results.json"):
@@ -308,10 +243,7 @@ class BenchmarkSuite:
             for r in results:
                 result_dict = {
                     'graph_name': r['graph_name'],
-                    'analysis_time': r['result'].analysis_time,
-                    'factorization_time': r['result'].factorization_time,
                     'total_time': r['result'].total_time,
-                    'structures_found': r['result'].structures_found,
                     'nodes_before': r['result'].nodes_before,
                     'nodes_after': r['result'].nodes_after,
                     'compression_ratio': r['result'].compression_ratio,
@@ -432,14 +364,18 @@ if __name__ == "__main__":
             graph = load_graph(path)
             print(f"✓ Graph loaded: {graph.number_of_nodes()} nodes, {graph.number_of_edges()} edges")
             
-            # Run beide varianten
+            # Run alle drie de varianten
             print("\n  Testing NoEquivalenceClosure...")
             result_no_eq = suite.run_benchmark(graph, name, 'NoEquivalenceClosure')
-            print(f"  ✓ Completed: {result_no_eq.structures_found} structures found")
-            
+            print(f"  ✓ Completed: {result_no_eq.nodes_before} → {result_no_eq.nodes_after} nodes ({result_no_eq.compression_ratio:.1%})")
+
             print("\n  Testing EquivalenceClosure...")
             result_eq = suite.run_benchmark(graph, name, 'EquivalenceClosure')
-            print(f"  ✓ Completed: {result_eq.structures_found} structures found")
+            print(f"  ✓ Completed: {result_eq.nodes_before} → {result_eq.nodes_after} nodes ({result_eq.compression_ratio:.1%})")
+
+            print("\n  Testing NestedCalls...")
+            result_nested = suite.run_benchmark(graph, name, 'NestedCalls')
+            print(f"  ✓ Completed: {result_nested.nodes_before} → {result_nested.nodes_after} nodes ({result_nested.compression_ratio:.1%})")
             
         except Exception as e:
             print(f"\n❌ Error testing {name}: {e}")

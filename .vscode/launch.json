@@ -137,7 +137,7 @@
             }
         },
         {
-            "name": "📊 Benchmark (beide varianten)",
+            "name": "📊 Benchmark Approaches",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/benchmark/benchmark.py",
@@ -148,6 +148,21 @@
             "presentation": {
                 "group": "2_approaches",
                 "order": 7
+            }
+        },
+        {
+            "name": "📊 Benchmark Approaches (no debug)",
+            "type": "debugpy",
+            "request": "launch",
+            "noDebug": true,
+            "program": "${workspaceFolder}/src/benchmark/benchmark.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+            },
+            "presentation": {
+                "group": "2_approaches",
+                "order": 8
             }
         },
         {
