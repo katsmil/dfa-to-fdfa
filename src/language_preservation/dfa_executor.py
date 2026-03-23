@@ -33,15 +33,19 @@ def find_start_node(G: nx.MultiDiGraph) -> str:
 
 
 def find_accepting_nodes(G: nx.MultiDiGraph) -> Set[str]:
-    """Find accepting states in a DFA graph (doublecircle shape or peripheries=2)."""
+    """Find accepting states in a DFA graph (doublecircle shape, peripheries=2,
+    or originally_accepting=True for internal SUB nodes in factored graphs)."""
     accepting = set()
     for node in G.nodes():
         nd = G.nodes[node]
         shape = str(nd.get('shape', '')).strip().strip('"').strip("'")
         peripheries = str(nd.get('peripheries', '')).strip().strip('"').strip("'")
+        originally = str(nd.get('originally_accepting', '')).strip().strip('"').strip("'").lower()
         if shape == 'doublecircle':
             accepting.add(node)
         elif peripheries == '2':
+            accepting.add(node)
+        elif originally == 'true':
             accepting.add(node)
     return accepting
 

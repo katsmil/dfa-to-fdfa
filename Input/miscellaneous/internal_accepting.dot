@@ -1,0 +1,24 @@
+digraph internal_accepting {
+  rankdir=LR;
+
+  __start0 [label="" shape=none width=0 height=0];
+  __start0 -> S;
+
+  S  [fillcolor=lightgreen];
+  T1 [fillcolor=lightgray];
+  T2 [fillcolor=lightgray];
+
+  q2 [shape=doublecircle fillcolor=lightpink];
+  q5 [shape=doublecircle fillcolor=lightpink];
+
+  S  -> q1 [label="p"];
+  S  -> q4 [label="q"];
+
+  q1 -> q2 [label="a"];
+  q2 -> q3 [label="b"];
+  q3 -> T1 [label="c"];
+
+  q4 -> q5 [label="a"];
+  q5 -> q6 [label="b"];
+  q6 -> T2 [label="c"];
+}
