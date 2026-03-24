@@ -1,6 +1,8 @@
-# DFA Compression
+# Beyond Minimality: Compressing DFAs Through Substructure Extraction
 
-This project contains several approaches for analysing and compressing general DFAs. Running the compression algorithm produces a so-called Factored DFA.
+> **Master's Thesis** — Milco Kats, Open Universiteit
+
+This repository contains the implementation accompanying the master's thesis *"Beyond Minimality: Compressing DFAs Through Substructure Extraction"*. It provides several approaches for analysing and compressing general DFAs by detecting and factoring out recurring substructures. Running the compression algorithm produces a so-called Factored DFA (FDFA).
 
 ## Project structure
 
