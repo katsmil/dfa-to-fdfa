@@ -195,9 +195,9 @@ class DFAExecutor:
                             break
                         else:
                             trace.append(f"  (return through {rc_node})")
-                            # Als de RC node zelf een frontier is van zijn moeder-
-                            # subroutine (peripheries=2), dan wordt hij het nieuwe
-                            # huidige frontier-punt voor de buitenste aanroeper.
+                            # If the RC node itself is a frontier of its parent
+                            # subroutine (peripheries=2), it becomes the new
+                            # current frontier point for the outer caller.
                             if self._is_frontier(rc_node):
                                 current = rc_node
 

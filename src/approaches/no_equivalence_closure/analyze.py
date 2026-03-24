@@ -3,19 +3,19 @@ from collections import defaultdict
 from typing import List, Tuple, Dict, Set
 
 from approaches.shared.base_analyzer import BaseSubstructureAnalyzer
-from approaches.shared.shared_types import MatchLocation, CanonicalSubstructure, BlueprintEdge
+from approaches.shared.shared_types import MatchLocation, BlueprintSubstructure, BlueprintEdge
 from approaches.shared.shared_utils import count_non_overlapping_locations, get_internals_and_frontiers, build_signature_buckets
 
 # ---------------------------------------------------------------------------
-# ANALYSE ENGINE
+# ANALYSIS ENGINE
 # ---------------------------------------------------------------------------
 
 class SubstructureAnalyzer(BaseSubstructureAnalyzer):
     """
-    NoEquivalenceClosure variant: minimale subklasse.
-    Erft get_node_signature en _get_edges_cached volledig van base class.
-    Produceert MatchLocation en CanonicalSubstructure uit shared_types,
-    inclusief internals en frontiers.
+    NoEquivalenceClosure variant: minimal subclass.
+    Fully inherits get_node_signature and _get_edges_cached from the base class.
+    Produces MatchLocation and BlueprintSubstructure from shared_types,
+    including internals and frontiers.
     """
 
     def _build_match_output(self, start_a, start_b, visited_pairs, blueprint_edges):
@@ -41,13 +41,13 @@ class SubstructureAnalyzer(BaseSubstructureAnalyzer):
 # ENTRY POINT
 # ---------------------------------------------------------------------------
 
-def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[CanonicalSubstructure]:
+def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[BlueprintSubstructure]:
     analyzer = SubstructureAnalyzer(G, min_overlap=min_size)
     buckets = build_signature_buckets(analyzer)
 
     structure_registry: Dict[tuple, Set[MatchLocation]] = defaultdict(set)
     blueprint_store: Dict[tuple, Tuple[BlueprintEdge, ...]] = {}
-    canonical_nodes_store: Dict[tuple, Tuple[str, ...]] = {}
+    blueprint_nodes_store: Dict[tuple, Tuple[str, ...]] = {}
 
     for nodes in buckets.values():
         for i in range(len(nodes)):
@@ -76,13 +76,13 @@ def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[CanonicalSubstru
 
                 if edges_tuple not in blueprint_store:
                     blueprint_store[edges_tuple] = tuple(match['blueprint_edges'])
-                    canonical_nodes_store[edges_tuple] = match['nodes_a']
+                    blueprint_nodes_store[edges_tuple] = match['nodes_a']
 
     results = []
     for edges_tuple, locations in structure_registry.items():
         loc_tuple = tuple(locations)
-        results.append(CanonicalSubstructure(
-            canonical_nodes=canonical_nodes_store[edges_tuple],
+        results.append(BlueprintSubstructure(
+            blueprint_nodes=blueprint_nodes_store[edges_tuple],
             overlap_size=len(loc_tuple[0].all_nodes),
             locations=loc_tuple,
             blueprint_edges=blueprint_store[edges_tuple],

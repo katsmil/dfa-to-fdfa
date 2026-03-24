@@ -3,24 +3,24 @@ from utils.graph_utils import read_dot
 from analysis.dominator_analysis import get_maximal_regions
 
 """
-ALGORITME: Dominator-Based Isomorphism Detector
+ALGORITHM: Dominator-Based Isomorphism Detector
 ===============================================
 
-Dit script identificeert herhalende (isomorfe) structuren binnen een gerichte graaf (DFA/Control Flow Graph).
+This script identifies recurring (isomorphic) structures within a directed graph (DFA/Control Flow Graph).
 
-Kernstappen:
-1. SCC-Isolatie: De graaf wordt opgedeeld in Strongly Connected Components.
-2. Dominator Analyse: Binnen elke SCC worden regio's gevormd op basis van de 
-   'Virtual Root Dominator' methode. Dit isoleert lussen met meerdere ingangen.
-3. Maximale Regio's: Alleen de grootste logische structuren worden behouden 
-   (geen fragmenten die al onderdeel zijn van een grotere regio).
-4. Isomorfie Check (NetworkX): 
-   In plaats van handmatige hashing gebruiken we `nx.is_isomorphic`.
-   Eerst wordt een pre-check gedaan op het aantal knopen en randen voor snelheid.
+Core steps:
+1. SCC Isolation: The graph is partitioned into Strongly Connected Components.
+2. Dominator Analysis: Within each SCC, regions are formed using the
+   'Virtual Root Dominator' method. This isolates loops with multiple entry points.
+3. Maximal Regions: Only the largest logical structures are retained
+   (no fragments that are already part of a larger region).
+4. Isomorphism Check (NetworkX):
+   Instead of manual hashing we use `nx.is_isomorphic`.
+   A pre-check on node and edge counts is done first for speed.
    https://networkx.org/documentation/stable/reference/algorithms/generated/networkx.algorithms.isomorphism.is_isomorphic.html#networkx.algorithms.isomorphism.is_isomorphic
 
-Gebruik:
-    python isomorphism_detector.py <pad_naar_file.dot>
+Usage:
+    python isomorphism_detector.py <path_to_file.dot>
 """
 
 def find_isomorphic_components(dot_file):
@@ -47,11 +47,11 @@ def find_isomorphic_components(dot_file):
         found = False
         for group in groups:
             ref = group[0]
-            # Pre-checks voor snelheid
+            # Pre-checks for speed
             if (comp['structure'].number_of_nodes() == ref['structure'].number_of_nodes() and
                 comp['structure'].number_of_edges() == ref['structure'].number_of_edges()):
                 
-                # Check of labels ook overeenkomen, dit kan op edges en op nodes
+                # Check whether labels also match — this applies to both edges and nodes
                 em = lambda e1, e2: e1.get('label') == e2.get('label')
                 #nm = lambda n1, n2: n1.get('label') == n2.get('label')
                 if nx.is_isomorphic(comp['structure'], ref['structure'], edge_match=em):
@@ -66,15 +66,15 @@ def find_isomorphic_components(dot_file):
 if __name__ == "__main__":
     import sys
     if len(sys.argv) != 2:
-        print(f"Gebruik: python {sys.argv[0]} <file.dot>")
+        print(f"Usage: python {sys.argv[0]} <file.dot>")
         sys.exit(1)
 
     dot_file = sys.argv[1]
     isomorphic_groups = find_isomorphic_components(dot_file)
 
-    print(f"\n--- Analyse Resultaten ---")
+    print(f"\n--- Analysis Results ---")
     if not isomorphic_groups:
-        print("Geen isomorfe dominator-regio's gevonden.")
+        print("No isomorphic dominator regions found.")
     
     for i, group in enumerate(isomorphic_groups, 1):
         print(f"\nIsomorfe Groep {i}:")

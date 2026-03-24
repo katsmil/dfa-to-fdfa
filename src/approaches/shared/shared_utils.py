@@ -6,24 +6,24 @@ from approaches.shared.shared_types import MatchLocation
 
 def count_non_overlapping_locations(locations: List[MatchLocation]) -> int:
     """
-    Berekent het aantal 'onafhankelijke' voorkomens van een substructuur.
+    Counts the number of 'independent' occurrences of a substructure.
 
-    Omdat matches nodes kunnen delen (overlap), geeft het totale aantal locaties
-    vaak een te optimistisch beeld van de besparing. Deze functie gebruikt een
-    'greedy' selectie om te bepalen hoeveel matches er geplaatst kunnen worden
-    zonder dat ze nodes met elkaar delen.
+    Because matches can share nodes (overlap), the total number of locations
+    often gives an overly optimistic picture of the savings. This function uses
+    a greedy selection to determine how many matches can be placed without
+    sharing nodes with each other.
 
-    Logica:
-    1. Sorteer locaties op start_node voor een deterministisch resultaat.
-    2. Loop door de locaties en claim de nodes van een match alleen als
-       geen enkele node van die match al door een eerdere match is geclaimd.
-    3. Tel alleen de matches die volledig vrij zijn van overlap.
+    Logic:
+    1. Sort locations by start_node for a deterministic result.
+    2. Iterate through locations and claim the nodes of a match only if
+       none of that match's nodes are already claimed by an earlier match.
+    3. Count only the matches that are completely free of overlap.
 
     Args:
-        locations: Een verzameling van gevonden MatchLocation objecten.
+        locations: A collection of found MatchLocation objects.
 
     Returns:
-        int: Het aantal disjuncte (niet-overlappende) locaties.
+        int: The number of disjoint (non-overlapping) locations.
     """
     count = 0
     claimed: Set[str] = set()
@@ -37,17 +37,17 @@ def count_non_overlapping_locations(locations: List[MatchLocation]) -> int:
 
 def get_internals_and_frontiers(analyzer, nodes: Tuple[str, ...]) -> Tuple[Tuple, Tuple]:
     """
-    Splitst de nodes van een match in internals en frontiers.
+    Splits the nodes of a match into internals and frontiers.
 
-    - internals: nodes zonder uitgaande externe edges (alle targets liggen binnen de match)
-    - frontiers: nodes met minstens één uitgaande externe edge
+    - internals: nodes with no outgoing external edges (all targets lie within the match)
+    - frontiers: nodes with at least one outgoing external edge
 
     Args:
-        analyzer: Een instantie van BaseSubstructureAnalyzer (voor _get_edges_cached).
-        nodes:    Geordende tuple van node-namen binnen de match.
+        analyzer: An instance of BaseSubstructureAnalyzer (for _get_edges_cached).
+        nodes:    Ordered tuple of node names within the match.
 
     Returns:
-        Tuple van (internals, frontiers), beide als tuple van node-namen.
+        Tuple of (internals, frontiers), both as tuples of node names.
     """
     nodes_set = set(nodes)
     internals, frontiers = [], []

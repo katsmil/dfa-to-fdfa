@@ -1,60 +1,61 @@
-# Compression general DFA
+# DFA Compression
 
-Dit project bevat verschillende benaderingen voor het analyseren en comprimeren van algemene DFA’s. Hieronder vind je een overzicht van de relevante folderstructuur en uitleg over het gebruik van de verschillende approaches. Het draaien van het compressie algoritme geeft als resultaat een zogeheten Factored DFA.
+This project contains several approaches for analysing and compressing general DFAs. Running the compression algorithm produces a so-called Factored DFA.
 
-## Projectstructuur
+## Project structure
 
 ```plaintext
 Compression Cyclic DFA/
 │
 ├── input/
-│   └── ...         # Voorbeeld- en testbestanden
+│   ├── miscellaneous/      # Small hand-crafted test automata
+│   ├── real_world/         # Larger real-world DFAs (URL parsers, etc.)
+│   └── test_automata/      # Systematic test cases (deel_1.dot - deel_11.dot)
 │
 ├── src/
 │   ├── approaches/
-│   │   ├── equivalence_closure/
-│   │   │   └── ... # Benaderingen met Equivalence Closure
-│   │   └── no_equivalence_closure/
-│   │       └── ... # Benaderingen zonder Equivalence Closure
-│   └── shared/
-│       └── ...     # Gedeelde code en utilities
+│   │   ├── shared/                               # Shared base classes and utilities
+│   │   ├── equivalence_closure/                  # Variant 1: with equivalence closure
+│   │   ├── no_equivalence_closure/               # Variant 2: without equivalence closure
+│   │   └── no_equivalence_closure_nested_calls/  # Variant 3: two-pass nested factorization
 │   ├── benchmark/
-│   │   └── benchmark.py   # benchmark
+│   │   └── benchmark.py                          # Variant-agnostic benchmark suite
 │   ├── language_preservation/
-│   │   └── language_preservation.py   # Test op taalbehoud
+│   │   └── run_validation.py                     # Validates language preservation across all variants
+│   └── tools/                                    # Standalone analysis utilities
 │
-└── README.md       # Projectdocumentatie
+├── output/                 # Generated factorized DOT files
+└── README.md
 ```
 
 ## Approaches
 
-  Te vinden in: `src/approaches/equivalence_closure/`  
-  Hier worden algoritmes gebruikt die de equivalentie-closure toepassen bij het analyseren van DFA’s.
+All three variants share the same base analysis and factorization infrastructure in `src/approaches/shared/`. They differ in how matching candidates are selected:
 
-  Te vinden in: `src/approaches/no_equivalence_closure/`  
-  Hier worden algoritmes gebruikt die geen equivalentie-closure toepassen.
+### Variant overview
+- **EquivalenceClosure** (`src/approaches/equivalence_closure/`): Uses a union-find structure to propagate equivalences between matched nodes across BFS iterations. Faster convergence for large automata.
+- **NoEquivalenceClosure** (`src/approaches/no_equivalence_closure/`): Compares all candidate pairs directly without equivalence tracking. Tends to yield better net compression.
+- **NestedCalls** (`src/approaches/no_equivalence_closure_nested_calls/`): Two-pass variant — first factorizes the original automaton, then searches for recurring patterns within the generated blueprint layer itself.
 
-### Variant toelichting
-- **EquivalenceClosure**: De snelle variant. Deze approach is geoptimaliseerd voor snelheid en levert snelle resultaten.
-- **NoEquivalenceClosure**: Deze variant geeft de beste netto compressie winst, maar is minder snel dan EquivalenceClosure.
+## Usage
 
-## Gebruik
-
-De verschillende onderdelen van het project zijn te starten via de configuraties in `launch.json`. 
+The different components can be launched via the configurations in `launch.json`.
 
 1. Open `launch.json` in VS Code.
-2. Kies een configuratie die overeenkomt met de gewenste approach (met of zonder Equivalence Closure).
-3. Start de configuratie om het bijbehorende script uit te voeren.
-
-Hiermee kun je eenvoudig de verschillende analysemethoden testen en vergelijken.
+2. Choose the configuration matching the desired variant.
+3. Run the configuration to execute the corresponding script.
 
 ## Extra tools
 
 ### Language Preservation
-Het script `src/language_preservation/language_preservation.py` test of de gefactoriseerde automaat dezelfde taal accepteert als het origineel. Dit is essentieel voor correctheidsbewijs en variant-onafhankelijk. Je kunt dit script draaien via de configuratie "🧪 Language Preservation Tester" in `launch.json`. Hiermee kun je controleren of de factorisatie geen fouten introduceert.
+The script `src/language_preservation/run_validation.py` verifies that the factorized automaton accepts the same language as the original. Run it from the terminal:
+
+```bash
+python3 src/language_preservation/run_validation.py real_world test_automata miscellaneous
+```
 
 ### Benchmark
-Het script `src/benchmark/benchmark.py` voert een variant-agnostische benchmark uit. Hiermee worden beide varianten (EquivalenceClosure en NoEquivalenceClosure) getest op dezelfde inputs en worden metrics verzameld zoals compressie, snelheid en correctheid. Start dit script via de configuratie "📊 Benchmark (beide varianten)" in `launch.json`.
+The script `src/benchmark/benchmark.py` runs a variant-agnostic benchmark, testing all three variants on the same inputs and collecting metrics for compression ratio, runtime, and correctness. Configure the `TEST_MODE` variable at the bottom of the file to select the input set.
 
 ---
-Folders zoals `output/`, `output_fases_combined/`, etc. bevatten gegenereerde bestanden en zijn niet relevant voor het gebruik van het project.
+Folders such as `output/` contain generated files and are not relevant for running the project.

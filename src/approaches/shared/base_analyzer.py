@@ -5,13 +5,13 @@ from approaches.shared.shared_types import BlueprintEdge
 
 class BaseSubstructureAnalyzer:
     """
-    Gedeelde BFS-kern voor bisimilariteitsanalyse.
+    Shared BFS core for bisimilarity analysis.
 
-    Subklassen implementeren:
-      - get_node_signature(node) → als de signatuur extra info nodig heeft (bv. accepting state)
-      - _build_match_output(...)  → bepaalt het returntype (SubstructureMatch of dict)
+    Subclasses implement:
+      - get_node_signature(node) → if the signature needs extra info (e.g. accepting state)
+      - _build_match_output(...)  → determines the return type (SubstructureMatch or dict)
 
-    De volledige BFS-lus, validatie en blueprint-opbouw zitten hier en worden NIET overridden.
+    The full BFS loop, validation, and blueprint construction live here and are NOT overridden.
     """
 
     def __init__(self, G: nx.MultiDiGraph, min_overlap: int = 2):
@@ -34,8 +34,8 @@ class BaseSubstructureAnalyzer:
 
     def _get_node_signature(self, node: str) -> tuple:
         """
-        Basisimplementatie: accepting op basis van 'shape' == 'doublecircle'.
-        Subklasse kan dit overriden om bv. ook 'accepting' attribuut mee te nemen.
+        Base implementation: accepting based on 'shape' == 'doublecircle'.
+        Subclass can override this to also include the 'accepting' attribute.
         """
         if node not in self._sig_cache:
             is_accepting = self.G.nodes[node].get('shape') == 'doublecircle'
@@ -45,7 +45,7 @@ class BaseSubstructureAnalyzer:
         return self._sig_cache[node]
 
     # ------------------------------------------------------------------
-    # BFS-KERN  (gedeeld, niet te overriden)
+    # BFS CORE  (shared, not to be overridden)
     # ------------------------------------------------------------------
 
     def _find_maximal_overlap(self, start_a: str, start_b: str) -> Optional[Any]:
@@ -67,8 +67,6 @@ class BaseSubstructureAnalyzer:
             if n1 == n2:
                 continue
             if n1 in nodes_in_b or n2 in nodes_in_a:
-                # return None -- overlap van structuren die zich op hetzelfde pad bevinden; ook indirecte overlap niet toestaan
-                # continue -- directe overlap afwijzen, indirecte overlap toestaan
                 return None
             if self._get_node_signature(n1) != self._get_node_signature(n2):
                 continue
@@ -76,7 +74,7 @@ class BaseSubstructureAnalyzer:
             e1 = self._get_edges_cached(n1)
             e2 = self._get_edges_cached(n2)
 
-            # Inkomende validatie
+            # Incoming validation
             for pred_a in self.G.predecessors(n1):
                 if pred_a in pair_mapping:
                     pred_b = pair_mapping[pred_a]
@@ -91,7 +89,7 @@ class BaseSubstructureAnalyzer:
                         if target_b == n2 and self._get_edges_cached(pred_a).get(label) != n1:
                             return None
 
-            # Uitgaande validatie
+            # Outgoing validation
             for label in set(e1.keys()) | set(e2.keys()):
                 t_a = e1.get(label)
                 t_b = e2.get(label)
@@ -134,7 +132,7 @@ class BaseSubstructureAnalyzer:
         return self._build_match_output(start_a, start_b, visited_pairs, blueprint_edges)
 
     # ------------------------------------------------------------------
-    # ABSTRACT  (subklasse verplicht te implementeren)
+    # ABSTRACT  (subclass must implement)
     # ------------------------------------------------------------------
 
     def _build_match_output(self, start_a: str, start_b: str,

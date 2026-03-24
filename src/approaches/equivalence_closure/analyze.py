@@ -4,11 +4,11 @@ from dataclasses import dataclass
 from typing import Set, Tuple, List, Dict
 
 from approaches.shared.base_analyzer import BaseSubstructureAnalyzer
-from approaches.shared.shared_types import MatchLocation, CanonicalSubstructure, BlueprintEdge
+from approaches.shared.shared_types import MatchLocation, BlueprintSubstructure, BlueprintEdge
 from approaches.shared.shared_utils import build_signature_buckets
 
 # ---------------------------------------------------------------------------
-# DATASTRUCTUREN
+# DATA STRUCTURES
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -23,7 +23,7 @@ class SubstructureMatch:
 
 
 # ---------------------------------------------------------------------------
-# HULPKLASSEN
+# HELPER CLASSES
 # ---------------------------------------------------------------------------
 
 class EquivalenceClosure:
@@ -45,12 +45,12 @@ class EquivalenceClosure:
 
 
 # ---------------------------------------------------------------------------
-# ANALYSE ENGINE
+# ANALYSIS ENGINE
 # ---------------------------------------------------------------------------
 
 class SubstructureAnalyzer(BaseSubstructureAnalyzer):
     """
-    Versie 1: gebruikt EquivalenceClosure
+    Version 1: uses EquivalenceClosure
     """
 
     def __init__(self, G: nx.DiGraph, min_overlap: int = 1):
@@ -77,10 +77,10 @@ class SubstructureAnalyzer(BaseSubstructureAnalyzer):
 
 
 # ---------------------------------------------------------------------------
-# AGGREGATIE & PRIORITERING
+# AGGREGATION & PRIORITIZATION
 # ---------------------------------------------------------------------------
 
-def _aggregate_canonical_results(matches: List[SubstructureMatch]) -> List[CanonicalSubstructure]:
+def _aggregate_blueprint_results(matches: List[SubstructureMatch]) -> List[BlueprintSubstructure]:
     structure_registry: Dict[tuple, List[SubstructureMatch]] = defaultdict(list)
 
     for m in matches:
@@ -93,7 +93,7 @@ def _aggregate_canonical_results(matches: List[SubstructureMatch]) -> List[Canon
 
     for edges_tuple, related_matches in structure_registry.items():
         first_m = related_matches[0]
-        canonical_nodes = list(first_m.nodes_a_ordered)
+        blueprint_nodes = list(first_m.nodes_a_ordered)
 
         seen_location_keys: Set[tuple] = set()
         locations = []
@@ -129,21 +129,21 @@ def _aggregate_canonical_results(matches: List[SubstructureMatch]) -> List[Canon
                 [n for n in b_nodes if n in b_fro],
             )
 
-        final_results.append(CanonicalSubstructure(
-            canonical_nodes=canonical_nodes,
-            overlap_size=len(canonical_nodes),
+        final_results.append(BlueprintSubstructure(
+            blueprint_nodes=blueprint_nodes,
+            overlap_size=len(blueprint_nodes),
             locations=tuple(locations),
             blueprint_edges=first_m.blueprint_edges,
         ))
 
     return final_results
 
-def _calculate_savings(sub: CanonicalSubstructure) -> int:
+def _calculate_savings(sub: BlueprintSubstructure) -> int:
     k = len(sub.locations)
     return sub.overlap_size * (k - 1) if k >= 2 else 0
 
 
-def _prioritize_candidates(candidates: List[CanonicalSubstructure]) -> List[CanonicalSubstructure]:
+def _prioritize_candidates(candidates: List[BlueprintSubstructure]) -> List[BlueprintSubstructure]:
     scored = [(_calculate_savings(s), s) for s in candidates if _calculate_savings(s) > 0]
     scored.sort(key=lambda x: (x[0], x[1].overlap_size), reverse=True)
     return [s for _, s in scored]
@@ -152,7 +152,7 @@ def _prioritize_candidates(candidates: List[CanonicalSubstructure]) -> List[Cano
 # ENTRY POINT
 # ---------------------------------------------------------------------------
 
-def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[CanonicalSubstructure]:
+def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[BlueprintSubstructure]:
     analyzer = SubstructureAnalyzer(G, min_overlap=min_size)
     buckets = build_signature_buckets(analyzer)
 
@@ -177,4 +177,4 @@ def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[CanonicalSubstru
                         analyzer.equivalence_closure.add_equivalence(a, b)
                     raw_results.append(match)
 
-    return _prioritize_candidates(_aggregate_canonical_results(raw_results))
+    return _prioritize_candidates(_aggregate_blueprint_results(raw_results))

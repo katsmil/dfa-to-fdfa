@@ -1,3 +1,3 @@
 """
-Gedeelde utilities voor alle benaderingen
+Shared utilities for all approaches
 """

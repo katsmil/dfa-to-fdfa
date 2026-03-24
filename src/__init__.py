@@ -1,1 +1,1 @@
-# Maak van 'code' een Python package zodat absolute imports werken
+# Make 'src' a Python package so that absolute imports work

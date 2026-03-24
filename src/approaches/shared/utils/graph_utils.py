@@ -1,7 +1,7 @@
 import networkx as nx
 
 def read_dot(path):
-    """Leest een DOT bestand in en zet het om naar een NetworkX DiGraph."""
+    """Reads a DOT file and converts it to a NetworkX DiGraph."""
     g = nx.drawing.nx_pydot.read_dot(path)
     G = nx.DiGraph()
 

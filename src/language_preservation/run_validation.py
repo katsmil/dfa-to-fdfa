@@ -1,10 +1,10 @@
 """
-Validatie: factoreer elk testbestand via alle drie varianten en controleer taalpreservatie.
-Draait volledig in-process (geen subprocessen) zodat er geen timeout-issues zijn.
+Validation: factorize each test file via all three variants and check language preservation.
+Runs entirely in-process (no subprocesses) to avoid timeout issues.
 
-Gebruik:
-  python3 src/language_preservation/run_validation.py                  → test alle subfolders van input/
-  python3 src/language_preservation/run_validation.py test_automata    → alleen die subfolder(s)
+Usage:
+  python3 src/language_preservation/run_validation.py                  → test all subfolders of input/
+  python3 src/language_preservation/run_validation.py test_automata    → only that subfolder(s)
   python3 src/language_preservation/run_validation.py miscellaneous real_world
 """
 
@@ -13,7 +13,7 @@ import io
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
-# Paden instellen zodat alle imports werken
+# Set up paths so all imports work
 # ---------------------------------------------------------------------------
 SRC        = Path(__file__).parent.parent   # src/
 INPUT_ROOT = SRC.parent / "input"
@@ -59,12 +59,12 @@ else:
 # ---------------------------------------------------------------------------
 
 def _run_variant(G_orig: nx.MultiDiGraph, output_dot: Path, factorize_fn) -> tuple:
-    """Factoreer en test één variant. Geeft (status, detail) terug."""
+    """Factorize and test one variant. Returns (status, detail)."""
     try:
         G_factorized = factorize_fn(G_orig)
         save_dot(G_factorized, str(output_dot))
     except Exception as e:
-        return f"FOUT (fact.)", str(e)
+        return f"ERROR (fact.)", str(e)
 
     _old_stdout = sys.stdout
     try:
@@ -75,7 +75,7 @@ def _run_variant(G_orig: nx.MultiDiGraph, output_dot: Path, factorize_fn) -> tup
         sys.stdout = _old_stdout
     except Exception as e:
         sys.stdout = _old_stdout
-        return f"FOUT (test)", str(e)
+        return f"ERROR (test)", str(e)
 
     mismatches = [tc for tc in all_cases if tc.is_mismatch]
     if all_match:
@@ -96,7 +96,7 @@ def test_folder(folder: Path) -> list:
         try:
             G_orig = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(str(dot_file)))
         except Exception as e:
-            results.append((name, "FOUT (inlezen)", "FOUT (inlezen)", "FOUT (inlezen)", str(e), "", ""))
+            results.append((name, "ERROR (read)", "ERROR (read)", "ERROR (read)", str(e), "", ""))
             continue
 
         statuses = []
@@ -113,23 +113,23 @@ def test_folder(folder: Path) -> list:
 
 
 # ---------------------------------------------------------------------------
-# Uitvoeren
+# Execute
 # ---------------------------------------------------------------------------
 
 all_results = []
 for folder in subfolders:
     if not folder.is_dir():
-        print(f"⚠️  Map niet gevonden: {folder}")
+        print(f"⚠️  Directory not found: {folder}")
         continue
     folder_results = test_folder(folder)
     for entry in folder_results:
         all_results.append((folder.name,) + entry)
 
 # ---------------------------------------------------------------------------
-# Samenvatting
+# Summary
 # ---------------------------------------------------------------------------
 COL = 16
-HDR = f"  {'bestand':<35}  {'NoEqClosure':>{COL}}  {'EqClosure':>{COL}}  {'Nested':>{COL}}"
+HDR = f"  {'file':<35}  {'NoEqClosure':>{COL}}  {'EqClosure':>{COL}}  {'Nested':>{COL}}"
 SEP = "─" * (35 + 3 * (COL + 2) + 4)
 
 print()
@@ -163,6 +163,6 @@ total  = len(all_results)
 passed = sum(1 for r in all_results if all("✅" in r[i] for i in [2, 3, 4]))
 print()
 print("=" * len(SEP))
-print(f"  TOTAAL: {total} bestanden  |  ✅ alle 3 OK: {passed}  |  ❌ minstens 1 fout: {total - passed}")
+print(f"  TOTAL: {total} files  |  ✅ all 3 OK: {passed}  |  ❌ at least 1 error: {total - passed}")
 print("=" * len(SEP))
 

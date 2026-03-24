@@ -6,38 +6,38 @@ import pydot
 import networkx as nx
 
 """
-ALGORITME BESCHRIJVING: SCC VISUALIZER & COLORIZER
+ALGORITHM DESCRIPTION: SCC VISUALIZER & COLORIZER
 ==================================================
 
-Dit script analyseert een gerichte graaf (DOT-formaat) en identificeert de 
-'Strongly Connected Components' (SCC's). Een SCC is een deel van de graaf 
-waarin elke knoop bereikbaar is vanaf elke andere knoop binnen diezelfde 
-component (een cyclus of een groep overlappende cycli).
+This script analyzes a directed graph (DOT format) and identifies the
+'Strongly Connected Components' (SCCs). An SCC is a part of the graph
+in which every node is reachable from every other node within that same
+component (a cycle or a group of overlapping cycles).
 
-Het proces verloopt in 3 stappen:
+The process runs in 3 steps:
 
-1. SCC ANALYSE (Tarjan of Kosaraju algoritme via NetworkX)
-   - Het script zoekt naar groepen knopen die samen gesloten lussen vormen.
-   - Knopen die geen deel uitmaken van een cyclus worden elk als een 
-     afzonderlijke SCC (van 1 knoop) beschouwd.
+1. SCC ANALYSIS (Tarjan or Kosaraju algorithm via NetworkX)
+   - The script looks for groups of nodes that together form closed loops.
+   - Nodes that are not part of a cycle are each considered a separate
+     SCC (of 1 node).
 
-2. KLEURCODERING
-   - Elke unieke SCC krijgt een eigen kleur toegewezen uit een kleurenpalet.
-   - Dit helpt de gebruiker om in één oogopslag te zien welke knopen 
-     onderling verbonden zijn en waar de "logische blokken" in de flow zitten.
+2. COLOR CODING
+   - Each unique SCC is assigned its own color from a color palette.
+   - This helps the user to see at a glance which nodes are
+     interconnected and where the 'logical blocks' in the flow are.
 
-3. VISUALISATIE EXPORT
-   - Het script genereert een nieuw .dot-bestand in de map 'Output/'.
-   - De oorspronkelijke structuur en labels blijven behouden, maar de knopen 
-     worden ingekleurd op basis van hun SCC-lidmaatschap.
-   - Er wordt een instructie geprint om de DOT-file om te zetten naar een 
-     afbeelding (PNG) via Graphviz.
+3. VISUALIZATION EXPORT
+   - The script generates a new .dot file in the 'Output/' folder.
+   - The original structure and labels are preserved, but the nodes
+     are colored based on their SCC membership.
+   - A command is printed to convert the DOT file to an
+     image (PNG) via Graphviz.
 """
 
 def load_graph(dot_file: str) -> nx.DiGraph:
     graphs = pydot.graph_from_dot_file(dot_file)
     if not graphs:
-        raise ValueError("Geen graph gevonden in DOT file")
+        raise ValueError("No graph found in DOT file")
 
     pydot_graph = graphs[0]
     return nx.DiGraph(nx.nx_pydot.from_pydot(pydot_graph))
@@ -100,7 +100,7 @@ def visualize_sccs(G: nx.DiGraph, sccs, output_dot: Path):
 
 
 def print_sccs(sccs):
-    print(f"Gevonden SCC's: {len(sccs)}\n")
+    print(f"SCCs found: {len(sccs)}\n")
     for i, comp in enumerate(sccs, start=1):
         print(f"SCC {i} ({len(comp)} nodes):")
         for node in sorted(comp):
@@ -110,20 +110,20 @@ def print_sccs(sccs):
 
 def main():
     if len(sys.argv) < 2:
-        print("Gebruik: python scc_visualize.py <input.dot>")
+        print("Usage: python scc_visualize.py <input.dot>")
         sys.exit(1)
 
     input_dot = sys.argv[1]
     input_path = Path(input_dot)
 
-    # Zorg ervoor dat de output folder bestaat
+    # Make sure the output folder exists
     output_folder = Path("output")
     output_folder.mkdir(parents=True, exist_ok=True)
 
-    # Genereer output bestandsnaam op basis van input
+    # Generate output filename based on input
     output_dot = output_folder / (input_path.stem + "_colored.dot")
 
-    print(f"Inlezen van: {input_dot}")
+    print(f"Reading: {input_dot}")
     G = load_graph(input_dot)
 
     print(f"Nodes: {G.number_of_nodes()}, edges: {G.number_of_edges()}")
@@ -133,8 +133,8 @@ def main():
 
     visualize_sccs(G, sccs, output_dot)
 
-    print(f"SCC-visualisatie geschreven naar: {output_dot}")
-    print("Render met:")
+    print(f"SCC visualization written to: {output_dot}")
+    print("Render with:")
     print(f"  dot -Tpng {output_dot} -o {output_folder / 'scc_colored.png'}")
 
 

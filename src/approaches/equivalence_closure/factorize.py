@@ -5,39 +5,39 @@ from analyze import CanonicalSubstructure, MatchLocation
 
 
 # ---------------------------------------------------------------------------
-# SUBROUTINE LOGICA
+# SUBROUTINE LOGIC
 # ---------------------------------------------------------------------------
 
 def create_subroutine_structure(G: nx.DiGraph, sub: CanonicalSubstructure, sub_id: int):
     """
-    Bouwt de abstracte subroutine op basis van het CanonicalSubstructure object.
+    Builds the abstract subroutine based on the CanonicalSubstructure object.
 
-    Naamgevingsconventie (uniform met algoritme 1):
+    Naming convention (uniform with algorithm 1):
       cluster:  subroutine_{sub_id}
-      nodes:    SUB_{sub_id}_{j}   waarbij j = positie in sub.canonical_nodes
+      nodes:    SUB_{sub_id}_{j}   where j = position in sub.canonical_nodes
       labels:   S0, S1, S2, ...
       entry:    sub.canonical_nodes[0] → SUB_{sub_id}_0 → label S0
 
-    Interne edges worden gebouwd via sub.blueprint_edges (index-gebaseerd),
-    NIET via graph-lookup. Dit ontkoppelt de subroutineopbouw volledig van
-    de concrete nodes in de originele graaf.
+    Internal edges are built via sub.blueprint_edges (index-based),
+    NOT via graph lookup. This fully decouples subroutine construction from
+    the concrete nodes in the original graph.
     """
     cluster_name = f"subroutine_{sub_id}"
 
-    # Positie j in canonical_nodes → SUB_{sub_id}_{j}
+    # Position j in canonical_nodes → SUB_{sub_id}_{j}
     sub_mapping = {node: f"SUB_{sub_id}_{j}" for j, node in enumerate(sub.canonical_nodes)}
 
-    # Voeg subroutine nodes toe met label S0, S1, S2, ...
+    # Add subroutine nodes with labels S0, S1, S2, ...
     for j, orig_node in enumerate(sub.canonical_nodes):
         G.add_node(sub_mapping[orig_node], cluster=cluster_name, label=f"S{j}")
 
-    # Dummy startpijl naar entry node (canonical_nodes[0] = S0)
+    # Dummy start arrow to entry node (canonical_nodes[0] = S0)
     start_dummy = f"__start_{cluster_name}"
     G.add_node(start_dummy, label="", shape="none", width="0", height="0", cluster=cluster_name)
     G.add_edge(start_dummy, sub_mapping[sub.canonical_nodes[0]])
 
-    # Bouw interne edges via blueprint_edges (indices → SUB-nodes)
-    # Volledig ontkoppeld van de originele graaf
+    # Build internal edges via blueprint_edges (indices → SUB nodes)
+    # Fully decoupled from the original graph
     idx_to_sub = {j: sub_mapping[node] for j, node in enumerate(sub.canonical_nodes)}
     for edge in sub.blueprint_edges:
         src = idx_to_sub[edge.source_idx]
@@ -49,11 +49,11 @@ def create_subroutine_structure(G: nx.DiGraph, sub: CanonicalSubstructure, sub_i
 
 
 # ---------------------------------------------------------------------------
-# FACTORISATIE KERN
+# FACTORIZATION CORE
 # ---------------------------------------------------------------------------
 
 def _is_valid_entry_structure(G: nx.DiGraph, start_node: str, instance_nodes: Set[str]) -> bool:
-    """Controleert of de structuur alleen via start_node wordt binnengegaan."""
+    """Checks whether the structure is entered only via start_node."""
     for node in instance_nodes:
         if node == start_node:
             continue
@@ -65,10 +65,10 @@ def _is_valid_entry_structure(G: nx.DiGraph, start_node: str, instance_nodes: Se
 
 def _process_exits(G: nx.DiGraph, loc: MatchLocation, sub_map: Dict[str, str], rc_id: str):
     """
-    Handelt transities af die de subroutine verlaten.
+    Handles transitions that exit the subroutine.
 
-    Gebruikt loc.frontiers uit MatchLocation — bepaald door analyze.py.
-    Bouwt de uitvoerbare dispatch map: δret(rc_id, frontier_sub_node, symbol) → target
+    Uses loc.frontiers from MatchLocation — determined by analyze.py.
+    Builds the executable dispatch map: δret(rc_id, frontier_sub_node, symbol) → target
     """
     dispatch_map = defaultdict(dict)  # dispatch_map[symbol][sub_frontier_node] = target
     instance_nodes = set(loc.all_nodes)
@@ -91,10 +91,10 @@ def _process_exits(G: nx.DiGraph, loc: MatchLocation, sub_map: Dict[str, str], r
                     "style": "filled"
                 })
 
-    # Sla uitvoerbare dispatch map op als node attribuut
+    # Store executable dispatch map as node attribute
     G.nodes[rc_id]['dispatch_map'] = dict(dispatch_map)
 
-    # Visueel label
+    # Visual label
     visual_rows = [
         f'"{l}": {", ".join(nodes.keys())}'
         for l, nodes in dispatch_map.items()
@@ -109,8 +109,8 @@ def _replace_instance_with_rc(G: nx.DiGraph,
                                subroutine_name: str,
                                sub_mapping: Dict[str, str]):
     """
-    Vervangt een instantie van de subroutine door een RC node.
-    Gebruikt loc.start_node als expliciete entry node.
+    Replaces an instance of the subroutine with an RC node.
+    Uses loc.start_node as the explicit entry node.
     """
     rc_node_id = f"RC_{loc.start_node}"
 
@@ -135,14 +135,14 @@ def apply_factorization(G: nx.DiGraph, results: List[CanonicalSubstructure]):
     processed_nodes = set()
 
     for sub_id, sub in enumerate(results):
-        # canonical_nodes[0] is de entry node (BFS-volgorde gegarandeerd door analyze.py)
+        # canonical_nodes[0] is the entry node (BFS-order guaranteed by analyze.py)
         sub_name = f"subroutine_{sub_id}"
 
         # global_sub_mapping: canonical_nodes[j] → SUB_{sub_id}_{j}
         global_sub_mapping = {node: f"SUB_{sub_id}_{j}"
                                for j, node in enumerate(sub.canonical_nodes)}
 
-        # --- STAP 1: PRE-SCAN ---
+        # --- STEP 1: PRE-SCAN ---
         valid_locations_to_process = []
         is_group_valid = True
 
@@ -152,7 +152,7 @@ def apply_factorization(G: nx.DiGraph, results: List[CanonicalSubstructure]):
                 break
 
             if _is_valid_entry_structure(G, loc.start_node, set(loc.all_nodes)):
-                # Positie-voor-positie koppeling: loc.all_nodes[j] → SUB_{sub_id}_{j}
+                # Positional mapping: loc.all_nodes[j] → SUB_{sub_id}_{j}
                 instance_mapping = {loc_node: global_sub_mapping[cn]
                                     for loc_node, cn in zip(loc.all_nodes, sub.canonical_nodes)}
                 valid_locations_to_process.append((loc, instance_mapping))
@@ -160,9 +160,9 @@ def apply_factorization(G: nx.DiGraph, results: List[CanonicalSubstructure]):
                 is_group_valid = False
                 break
 
-        # --- STAP 2: COMMIT ---
+        # --- STEP 2: COMMIT ---
         if is_group_valid and len(valid_locations_to_process) >= 2:
-            # Subroutine bouwen via CanonicalSubstructure object (inclusief blueprint_edges)
+            # Build subroutine via CanonicalSubstructure object (including blueprint_edges)
             create_subroutine_structure(G, sub, sub_id)
 
             for loc, instance_mapping in valid_locations_to_process:
@@ -170,10 +170,10 @@ def apply_factorization(G: nx.DiGraph, results: List[CanonicalSubstructure]):
                 all_nodes_to_remove.update(loc.all_nodes)
                 processed_nodes.update(loc.all_nodes)
 
-            print(f"Succes: {sub_name} gefactoriseerd op {len(valid_locations_to_process)} locaties.")
+            print(f"Success: {sub_name} factorized at {len(valid_locations_to_process)} locations.")
         else:
             if not is_group_valid:
-                print(f"Overgeslagen: {sub_name} bevat ongeldige of overlappende locaties.")
+                print(f"Skipped: {sub_name} contains invalid or overlapping locations.")
 
     G.remove_nodes_from(all_nodes_to_remove)
     return G
@@ -181,4 +181,4 @@ def apply_factorization(G: nx.DiGraph, results: List[CanonicalSubstructure]):
 
 def save_dot(G, filename):
     nx.drawing.nx_pydot.write_dot(G, filename)
-    print(f"Gefactoriseerde graaf opgeslagen als: {filename}")
+    print(f"Factorized graph saved as: {filename}")

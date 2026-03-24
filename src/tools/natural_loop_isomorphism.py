@@ -1,20 +1,20 @@
 """
-ALGORITME: Natural Loop Isomorphism Detector
+ALGORITHM: Natural Loop Isomorphism Detector
 ============================================
 
-Dit script vindt isomorfe structuren door Natural Loops te identificeren.  
-Een Natural Loop van een back-edge (m→n), 
-waarbij n de knoop m domineert, 
-is de verzameling knopen x zodanig dat n de knoop x domineert 
-en er een pad bestaat van x naar m dat n niet passeert.
+This script finds isomorphic structures by identifying Natural Loops.
+A Natural Loop of a back-edge (m→n),
+where n dominates m,
+is the set of nodes x such that n dominates x
+and a path exists from x to m that does not pass through n.
 
 
-Kernstappen:
-1. SCC-Isolatie: Analyse per sterk verbonden component.
-2. Virtual Root: Tbv lokale dominator-berekening binnen de SCC.
-3. Back-Edge Detectie: Zoekt naar transities die terugkeren naar een dominator.
-4. Loop Body Reconstructie: Vindt alle knopen die deel uitmaken van die specifieke lus.
-5. Isomorfie Groepering: Vergelijkt de gevonden lussen middels NetworkX (topologie + labels).
+Core steps:
+1. SCC Isolation: Analysis per strongly connected component.
+2. Virtual Root: For local dominator computation within the SCC.
+3. Back-Edge Detection: Looks for transitions returning to a dominator.
+4. Loop Body Reconstruction: Finds all nodes that are part of that specific loop.
+5. Isomorphism Grouping: Compares found loops via NetworkX (topology + labels).
 """
 
 import networkx as nx
@@ -22,7 +22,7 @@ from collections import defaultdict
 from utils.graph_utils import read_dot
 
 def get_all_dominators(idoms):
-    """Zet immediate dominators om naar een volledige set per knoop."""
+    """Convert immediate dominators to a full set per node."""
     all_doms = defaultdict(set)
     for node in idoms:
         curr = node
@@ -30,7 +30,7 @@ def get_all_dominators(idoms):
             all_doms[node].add(curr)
             parent = idoms[curr]
             
-            # Stopconditie: we zijn bij een root (knoop domineert zichzelf)
+            # Stop condition: we are at a root (node dominates itself)
             if parent == curr:
                 break
                 
@@ -46,14 +46,14 @@ def find_isomorphic_components(dot_file):
         if len(scc) < 2:
             continue
 
-        # Maak een lokale kopie voor dominator analyse
+        # Create a local copy for dominator analysis
         S = G.subgraph(scc).copy()
         
-        # Entries vinden
+        # Find entries
         entries = {n for n in scc if any(p not in scc for p in G.predecessors(n))}
         if not entries: entries = {min(scc)}
         
-        # Virtual Root plaatsen (soort van aggregaat)
+        # Place Virtual Root (acts as aggregate)
         v_root = "__VIRTUAL_ROOT__"
         S.add_node(v_root)
         for e in entries: S.add_edge(v_root, e)
@@ -62,38 +62,38 @@ def find_isomorphic_components(dot_file):
         idoms = nx.immediate_dominators(S, v_root)
         all_doms = get_all_dominators(idoms)
 
-        # 3. Zoek Back-Edges en identificeer Natural Loops
+        # 3. Search for Back-Edges and identify Natural Loops
         for tail, header in S.edges():
-            # Sla de virtuele root over
+            # Skip the virtual root
             if header == v_root: 
                 continue
             
-            # Een back-edge bestaat als de 'header' de 'tail' domineert
+            # A back-edge exists if the 'header' dominates the 'tail'
             if header in all_doms[tail]:
-                # We hebben een back-edge gevonden! 
-                # Reconstrueer de loop body: alle nodes die de tail kunnen 
-                # bereiken zonder de header te passeren.
+                # Found a back-edge!
+                # Reconstruct the loop body: all nodes that can reach
+                # the tail without passing through the header.
                 loop_nodes = {header, tail}
                 stack = [tail]
                 
                 while stack:
                     curr = stack.pop()
                     for pred in S.predecessors(curr):
-                        # Stop bij de header en de virtual root
+                        # Stop at the header and the virtual root
                         if pred not in loop_nodes and pred != v_root:
                             loop_nodes.add(pred)
                             stack.append(pred)
                 
-                # Sla de lus op voor isomorfie-check
+                # Store the loop for isomorphism check
                 all_found_loops.append({
                     'header': header,
                     'nodes': loop_nodes,
                     'structure': G.subgraph(loop_nodes).copy()
                 })
 
-    # 4. Isomorfie Groepering middels NetworkX
+    # 4. Isomorphism Grouping via NetworkX
     groups = []
-    # Filter eerst op unieke node-sets om dubbele lussen (bij meerdere back-edges) te voorkomen
+    # Filter first for unique node sets to avoid duplicate loops (with multiple back-edges)
     unique_loops = []
     seen_sets = []
     for l in all_found_loops:
@@ -109,7 +109,7 @@ def find_isomorphic_components(dot_file):
             if (comp['structure'].number_of_nodes() == ref['structure'].number_of_nodes() and
                 comp['structure'].number_of_edges() == ref['structure'].number_of_edges()):
                 
-                # Check of labels ook overeenkomen, dit kan op edges en op nodes
+                # Check whether labels also match, both on edges and on nodes
                 em = lambda e1, e2: e1.get('label') == e2.get('label')
                 #nm = lambda n1, n2: n1.get('label') == n2.get('label')
                 if nx.is_isomorphic(comp['structure'], ref['structure'], edge_match=em):
@@ -124,15 +124,15 @@ def find_isomorphic_components(dot_file):
 if __name__ == "__main__":
     import sys
     if len(sys.argv) != 2:
-        print(f"Gebruik: python {sys.argv[0]} <file.dot>")
+        print(f"Usage: python {sys.argv[0]} <file.dot>")
         sys.exit(1)
 
     dot_file = sys.argv[1]
     isomorphic_groups = find_isomorphic_components(dot_file)
 
-    print(f"\n--- Analyse Resultaten: {dot_file} ---")
+    print(f"\n--- Analysis Results: {dot_file} ---")
     if not isomorphic_groups:
-        print("Geen isomorfe lussen gevonden.")
+        print("No isomorphic loops found.")
     
     for i, group in enumerate(isomorphic_groups, 1):
         print(f"\nIsomorfe Groep {i} (Aantal: {len(group)}):")

@@ -142,8 +142,8 @@ def _find_suffix_to_reject(node: str,
         # Node itself is already rejecting
         return []
 
-    # Bereken het volledige alfabet eenmalig buiten de BFS-lus.
-    # (Niet per iteratie herberekenen — dat is O(states * transitions) per stap.)
+    # Compute the full alphabet once outside the BFS loop.
+    # (Avoid recomputing per iteration — that is O(states * transitions) per step.)
     all_syms = set(sym for trans in table.values() for sym in trans.keys())
 
     visited: Dict[str, List[str]] = {node: []}

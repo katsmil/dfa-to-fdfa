@@ -12,15 +12,15 @@ class BlueprintEdge:
 @dataclass(frozen=True)
 class MatchLocation:
     """
-    Representeert één specifieke plek waar de subroutine-structuur gevonden is.
+    Represents one specific location where the subroutine structure was found.
 
-    - start_node:  entry node van deze instantie
-    - all_nodes:   volgorde correspondeert positie-voor-positie met
-                   CanonicalSubstructure.canonical_nodes
-    - internals:   nodes zonder uitgaande externe edges
-    - frontiers:   nodes met minstens één uitgaande externe edge
+    - start_node:  entry node of this instance
+    - all_nodes:   order corresponds position-for-position with
+                   BlueprintSubstructure.blueprint_nodes
+    - internals:   nodes with no outgoing external edges
+    - frontiers:   nodes with at least one outgoing external edge
 
-    Tuple ipv List zodat MatchLocation hashbaar is (nodig voor set-gebruik in run_analysis).
+    Tuple instead of List so MatchLocation is hashable (required for set usage in run_analysis).
     """
     start_node: str
     all_nodes: Tuple[str, ...]
@@ -29,15 +29,15 @@ class MatchLocation:
 
 
 @dataclass(frozen=True)
-class CanonicalSubstructure:
+class BlueprintSubstructure:
     """
-    De blauwdruk van een herhalende deelstructuur.
+    The blueprint of a subcomponent.
 
-    - canonical_nodes[0] is ALTIJD de entry node (BFS-volgorde eerste match)
-    - blueprint_edges beschrijft de topologie als indices in canonical_nodes,
-      onafhankelijk van concrete node-namen
+    - blueprint_nodes[0] is ALWAYS the entry node (BFS-order of first match)
+    - blueprint_edges describes the topology as indices into blueprint_nodes,
+      independent of concrete node names
     """
-    canonical_nodes: Tuple[str, ...]
+    blueprint_nodes: Tuple[str, ...]
     overlap_size: int
     locations: Tuple[MatchLocation, ...]
     blueprint_edges: Tuple[BlueprintEdge, ...]

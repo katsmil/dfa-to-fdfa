@@ -2,29 +2,29 @@ import networkx as nx
 from collections import defaultdict
 from typing import List, Set, Dict, Tuple, Optional
 
-from approaches.shared.shared_types import MatchLocation, CanonicalSubstructure
+from approaches.shared.shared_types import MatchLocation, BlueprintSubstructure
 
 
 # ---------------------------------------------------------------------------
-# SUBROUTINE BOUWEN
+# BUILD SUBROUTINE
 # ---------------------------------------------------------------------------
 
 def _create_subroutine_structure(G: nx.MultiDiGraph,
-                                 sub: CanonicalSubstructure,
+                                 sub: BlueprintSubstructure,
                                  sub_id: int) -> Tuple[str, Dict[str, str]]:
     """
-    Bouwt de abstracte subroutine in G op basis van CanonicalSubstructure.
+    Builds the abstract subroutine in G based on the BlueprintSubstructure.
 
-    sub_mapping: canonical_node_naam → SUB_{sub_id}_{j}
-    canonical_nodes[0] is gegarandeerd de entry node (BFS-volgorde uit analyze.py).
-    Interne edges worden gebouwd via blueprint_edges (index-gebaseerd),
-    volledig ontkoppeld van de originele graaf.
+    sub_mapping: blueprint_node_name → SUB_{sub_id}_{j}
+    blueprint_nodes[0] is guaranteed to be the entry node (BFS-order from analyze.py).
+    Internal edges are built via blueprint_edges (index-based),
+    fully decoupled from the original graph.
     """
     cluster_name = f"subroutine_{sub_id}"
     sub_mapping = {node: f"SUB_{sub_id}_{j}"
-                   for j, node in enumerate(sub.canonical_nodes)}
+                   for j, node in enumerate(sub.blueprint_nodes)}
 
-    for j, orig_node in enumerate(sub.canonical_nodes):
+    for j, orig_node in enumerate(sub.blueprint_nodes):
         originally_accepting = _is_accepting_node(G, orig_node)
         G.add_node(sub_mapping[orig_node],
                    cluster=cluster_name,
@@ -34,9 +34,9 @@ def _create_subroutine_structure(G: nx.MultiDiGraph,
     start_dummy = f"__start_{cluster_name}"
     G.add_node(start_dummy, label="", shape="none", width="0", height="0",
                cluster=cluster_name)
-    G.add_edge(start_dummy, sub_mapping[sub.canonical_nodes[0]])
+    G.add_edge(start_dummy, sub_mapping[sub.blueprint_nodes[0]])
 
-    idx_to_sub = {j: sub_mapping[node] for j, node in enumerate(sub.canonical_nodes)}
+    idx_to_sub = {j: sub_mapping[node] for j, node in enumerate(sub.blueprint_nodes)}
     existing_edges: set = set()
     for edge in sub.blueprint_edges:
         src = idx_to_sub[edge.source_idx]
@@ -68,12 +68,12 @@ def _is_accepting_node(G: nx.MultiDiGraph, node: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# INSTANTIE VERVANGING
+# INSTANCE REPLACEMENT
 # ---------------------------------------------------------------------------
 
 def _build_instance_mapping(loc: MatchLocation,
                               sub_mapping: Dict[str, str]) -> Dict[str, str]:
-    """Koppelt concrete nodes van deze instantie aan SUB-nodes via positievolgorde."""
+    """Maps concrete nodes of this instance to SUB-nodes via positional order."""
     return {loc_node: sub_mapping[cn]
             for loc_node, cn in zip(loc.all_nodes, sub_mapping.keys())}
 
@@ -148,17 +148,17 @@ def _replace_instance_with_rc(G: nx.MultiDiGraph,
                                 loc: MatchLocation,
                                 sub_name: str,
                                 instance_mapping: Dict[str, str]):
-    """Vervangt één instantie van de subroutine door een RC node."""
+    """Replaces one instance of the subroutine with an RC node."""
     rc_id = f"RC_{loc.start_node}"
 
     if not G.has_node(rc_id):
         rc_attrs = dict(shape='box', style='filled', fillcolor='orange',
                         label=f"RC: {sub_name}")
-        # Erf cluster over van de vervangen startnode (nodig voor tweede-iteratie nesting)
+        # Inherit cluster from the replaced start node (needed for second-iteration nesting)
         start_cluster = G.nodes[loc.start_node].get('cluster')
         if start_cluster:
             rc_attrs['cluster'] = start_cluster
-            # peripheries=2 wordt pas gezet na _process_exits (zie hieronder).
+            # peripheries=2 is only set after _process_exits (see below).
         G.add_node(rc_id, **rc_attrs)
 
     instance_nodes = set(loc.all_nodes)
@@ -168,13 +168,13 @@ def _replace_instance_with_rc(G: nx.MultiDiGraph,
 
     _process_exits(G, loc, instance_mapping, rc_id)
 
-    # Een geneste RC node is alleen een frontier van zijn moeder-subroutine als
-    # minstens één van de vervangen instance-nodes zelf al frontier was
-    # (peripheries=2). De RC node neemt dan de frontier-rol van die node over.
+    # A nested RC node is only a frontier of its parent subroutine if
+    # at least one of the replaced instance-nodes was already a frontier
+    # (peripheries=2). The RC node then takes over the frontier role of that node.
     #
-    # Let op: als de dispatch-target van deze RC node een frontier is, wordt de
-    # RC node zelf NIET frontier — de controle keert terug naar de aanroeper
-    # vanuit die frontier-node, niet vanuit de RC node.
+    # Note: if the dispatch target of this RC node is a frontier, the
+    # RC node itself is NOT a frontier — control returns to the caller
+    # from that frontier node, not from the RC node.
     parent_cluster = G.nodes[rc_id].get('cluster')
     if parent_cluster:
         for orig_node in loc.all_nodes:
@@ -263,13 +263,13 @@ def _update_dispatch_maps(G: nx.MultiDiGraph,
 
 
 # ---------------------------------------------------------------------------
-# VALIDATIE
+# VALIDATION
 # ---------------------------------------------------------------------------
 
 def _is_valid_entry_structure(G: nx.MultiDiGraph,
                                 start_node: str,
                                 instance_nodes: Set[str]) -> bool:
-    """Controleert of de structuur alleen via start_node wordt binnengegaan."""
+    """Checks whether the structure is entered only via start_node."""
     for node in instance_nodes:
         if node == start_node:
             continue
@@ -285,15 +285,15 @@ def _is_valid_entry_structure(G: nx.MultiDiGraph,
 
 def _build_dispatch_signatures(G: nx.MultiDiGraph) -> Dict[str, Dict[str, Dict[str, str]]]:
     """
-    Bouw per RC-node een geneste map: {label: {frontier_node: target}}.
+    Build a nested map per RC node: {label: {frontier_node: target}}.
 
-    Dit wordt gebruikt in _filter_soft om te controleren of twee kandidaat-nodes
-    door DEZELFDE RC-node worden aangerefereerd met VERSCHILLENDE exit-targets voor
-    hetzelfde label. In dat geval zou samenvoeging de dispatch_map van die RC-node
-    beschadigen (twee frontier-keys worden één, maar de targets wijken af).
+    Used in _filter_locations to check whether two candidate nodes are
+    referenced by the SAME RC node with DIFFERENT exit targets for the same
+    label. In that case, merging them would corrupt the dispatch_map of that
+    RC node (two frontier keys become one, but the targets differ).
 
-    Nodes die uitsluitend door verschillende RC-nodes worden aangesproken zijn
-    veilig samen te voegen — elke outer RC-node behoudt zijn eigen dispatch-entry.
+    Nodes referenced by different RC nodes are always safe to merge — each
+    outer RC node retains its own dispatch entry.
     """
     import ast as _ast
     rc_dispatch: Dict[str, Dict[str, Dict[str, str]]] = {}
@@ -317,20 +317,19 @@ def _build_dispatch_signatures(G: nx.MultiDiGraph) -> Dict[str, Dict[str, Dict[s
 
 
 def _filter_locations(G: nx.MultiDiGraph,
-                  sub: CanonicalSubstructure,
+                  sub: BlueprintSubstructure,
                   sub_mapping: Dict[str, str],
                   processed_nodes: Set[str],
                   dispatch_signatures: Optional[Dict[str, Dict[str, Dict[str, str]]]] = None) -> Tuple[List, bool]:
     """
-    Filtert de locaties van een subroutinepatroon. Ongeldige of overlappende
-    locaties worden overgeslagen; de rest wordt geprobeerd.
+    Filters the locations of a subroutine pattern. Invalid or overlapping
+    locations are skipped; the rest are tried.
 
-    dispatch_signatures-check: twee locaties mogen alleen samengevoegd worden
-    als er geen RC-node bestaat die zowel ref_node als cand_node (op dezelfde
-    canonicale positie) als frontier-key heeft voor hetzelfde label met
-    verschillende targets. In dat geval raken de exit-paden van die RC-node
-    verward na samenvoeging. Nodes die door verschillende RC-nodes worden
-    aangesproken zijn altijd veilig samen te voegen.
+    dispatch_signatures check: two locations may only be merged if no RC node
+    exists that references both ref_node and cand_node (at the same canonical
+    position) as frontier keys for the same label with different targets. In
+    that case merging would corrupt the exit paths of that RC node. Nodes
+    referenced by different RC nodes are always safe to merge.
     """
     valid = []
     nodes_in_batch: Set[str] = set()
@@ -344,15 +343,15 @@ def _filter_locations(G: nx.MultiDiGraph,
         if not _is_valid_entry_structure(G, loc.start_node, loc_nodes):
             continue
 
-        # Intra-instance dispatch-conflict check: als een outer RC-node twee of meer
-        # nodes uit déze locatie als frontier-keys gebruikt voor hetzelfde label maar
-        # met VERSCHILLENDE targets, dan zou vervanging door één RC node die
-        # onderscheiding kwijtraken. Zo'n locatie moet worden overgeslagen.
+        # Intra-instance dispatch-conflict check: if an outer RC node uses two or more
+        # nodes from THIS location as frontier keys for the same label but with
+        # DIFFERENT targets, replacing them with a single RC node would lose that
+        # distinction. Such a location must be skipped.
         if dispatch_signatures is not None:
             intra_conflict = False
             for rc_node_map in dispatch_signatures.values():
                 for label, frontier_to_target in rc_node_map.items():
-                    # Verzamel alle targets voor nodes in deze locatie
+                    # Collect all targets for nodes in this location
                     targets_in_loc = {
                         n: t for n, t in frontier_to_target.items()
                         if n in loc_nodes
@@ -368,7 +367,7 @@ def _filter_locations(G: nx.MultiDiGraph,
         valid.append((loc, _build_instance_mapping(loc, sub_mapping)))
         nodes_in_batch.update(loc_nodes)
 
-    return valid, True  # groep altijd geldig; commit-beslissing via len(valid) >= 2
+    return valid, True  # group always valid; commit decision is via len(valid) >= 2
 
 
 # ---------------------------------------------------------------------------
@@ -376,7 +375,7 @@ def _filter_locations(G: nx.MultiDiGraph,
 # ---------------------------------------------------------------------------
 
 def apply_factorization(G: nx.MultiDiGraph,
-                         results: List[CanonicalSubstructure]) -> nx.MultiDiGraph:
+                         results: List[BlueprintSubstructure]) -> nx.MultiDiGraph:
     processed_nodes: Set[str] = set()
     nodes_to_remove: Set[str] = set()
     replaced_by: Dict[str, str] = {}
@@ -404,7 +403,7 @@ def apply_factorization(G: nx.MultiDiGraph,
         sub_id = sub_id_start + sub_id_offset
         sub_name = f"subroutine_{sub_id}"
         sub_mapping = {node: f"SUB_{sub_id}_{j}"
-                       for j, node in enumerate(sub.canonical_nodes)}
+                       for j, node in enumerate(sub.blueprint_nodes)}
 
         valid_locations, is_group_valid = _filter_locations(
             G, sub, sub_mapping, processed_nodes, dispatch_signatures)
@@ -426,7 +425,7 @@ def apply_factorization(G: nx.MultiDiGraph,
                     frontier_key_replacements[loc_node] = rc_id
 
                 # Separate mapping used to propagate peripheries=2 to the
-                # canonical SUB nodes of the inner subroutine.  These nodes
+                # blueprint SUB nodes of the inner subroutine.  These nodes
                 # inherited their frontier status from the blueprint nodes they
                 # replaced, but _process_exits cannot detect it (blueprint nodes
                 # have no graph-level external edges — those live in dispatch_maps).
@@ -439,7 +438,7 @@ def apply_factorization(G: nx.MultiDiGraph,
                 nodes_to_remove.update(loc.all_nodes)
                 processed_nodes.update(loc.all_nodes)
 
-    # Propagate peripheries=2 to the canonical SUB nodes of inner subroutines.
+    # Propagate peripheries=2 to the blueprint SUB nodes of inner subroutines.
     # Blueprint nodes have no graph-level external edges (those are in dispatch_maps),
     # so _process_exits cannot mark them as frontiers. We recover the frontier
     # status from the original SUB nodes they replaced.
@@ -460,24 +459,18 @@ def apply_factorization(G: nx.MultiDiGraph,
     return G
 
 # ---------------------------------------------------------------------------
-# OPSLAAN
+# SAVE
 # ---------------------------------------------------------------------------
 
-# def save_dot(G: nx.MultiDiGraph, filename: str):
-#     try:
-#         nx.drawing.nx_pydot.write_dot(G, filename)
-#         print(f"Gefactoriseerde graaf opgeslagen: {filename}")
-#     except Exception as e:
-#         print(f"Fout bij opslaan: {e}")
 
 def save_dot(G: nx.MultiDiGraph, filename: str):
-    # 1. Maak een tijdelijke DiGraph voor de export
+    # 1. Create a temporary DiGraph for export
     export_G = nx.DiGraph()
 
-    # Neem globale graaf-attributen over (zoals name="bigSmall")
+    # Copy global graph attributes (e.g. name="bigSmall")
     export_G.graph.update(G.graph)
 
-    # 2. Kopieer nodes en maak dicts veilig voor DOT
+    # 2. Copy nodes and make dicts safe for DOT
     for node, data in G.nodes(data=True):
         clean_attrs = {}
         for k, v in data.items():
@@ -487,7 +480,7 @@ def save_dot(G: nx.MultiDiGraph, filename: str):
                 clean_attrs[k] = str(v).strip('"')
         export_G.add_node(node, **clean_attrs)
 
-    # 3. Verzamel ALLE unieke edges en hun attributen
+    # 3. Collect ALL unique edges and their attributes
     all_unique_edges = set()
     edge_groups = defaultdict(list)
     edge_metadata = {}
@@ -495,31 +488,31 @@ def save_dot(G: nx.MultiDiGraph, filename: str):
     for u, v, data in G.edges(data=True):
         all_unique_edges.add((u, v))
         
-        # Verzamel labels als ze bestaan
+        # Collect labels if they exist
         if 'label' in data:
             edge_groups[(u, v)].append(str(data['label']).strip('"'))
         
-        # Bewaar overige metadata (van de eerste edge die we zien)
+        # Store remaining metadata (from the first edge we encounter)
         if (u, v) not in edge_metadata:
             edge_metadata[(u, v)] = {k: val for k, val in data.items() if k != 'label'}
 
-    # 4. Voeg alle edges toe aan de nieuwe graaf
+    # 4. Add all edges to the new graph
     for u, v in all_unique_edges:
         labels = edge_groups.get((u, v), [])
         meta = edge_metadata.get((u, v), {})
         
         if labels:
-            # Combineer labels met een komma
+            # Combine labels with a comma
             combined_label = ",".join(sorted(set(labels)))
             export_G.add_edge(u, v, label=combined_label, **meta)
         else:
-            # Voeg edge toe zonder label (zoals __start0 -> q0)
+            # Add edge without label (e.g. __start0 -> q0)
             export_G.add_edge(u, v, **meta)
 
-    # 5. Opslaan via pydot
+    # 5. Save via pydot
     try:
         pd_graph = nx.drawing.nx_pydot.to_pydot(export_G)
         pd_graph.write_raw(filename)
-        print(f"Gefactoriseerde graaf succesvol opgeslagen: {filename}")
+        print(f"Factorized graph saved successfully: {filename}")
     except Exception as e:
-        print(f"Fout bij opslaan: {e}")
+        print(f"Error saving file: {e}")
