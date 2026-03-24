@@ -1,3 +1,0 @@
-"""
-Standalone utility tools
-"""

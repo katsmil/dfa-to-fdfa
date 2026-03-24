@@ -1,7 +1,0 @@
-digraph Minimized_DFA {
-rankdir=LR;
-__start0 [shape=none, label=""];
-__start0 -> 0;
-0 [shape=circle];
-0 -> 0 [label="0,1"];
-}
