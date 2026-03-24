@@ -102,9 +102,9 @@ class DFAExecutor:
         """
         Nodes where execution terminates and the input is accepted.
 
-        - Outside subroutines: doublecircle or peripheries=2 (original DFA convention).
-        - Inside subroutines (SUB_* / cluster 'subroutine_*'): only if
-          originally_accepting=True.  A bare peripheries=2 inside a subroutine
+        - Outside subcomponents: doublecircle or peripheries=2 (original DFA convention).
+        - Inside subcomponents (SUB_* / cluster 'subroutine_*'): only if
+          originally_accepting=True.  A bare peripheries=2 inside a subcomponent
           signals a frontier (control-flow return point), NOT input acceptance.
         """
         accepting = set()
@@ -129,7 +129,7 @@ class DFAExecutor:
         """
         Nodes that can return control flow to their RC caller.
 
-        A frontier is a subroutine-context node (SUB_* / cluster 'subroutine_*')
+        A frontier is a subcomponent-context node (SUB_* / cluster 'subroutine_*')
         marked peripheries=2 by _process_exits.  Nested RC nodes that inherited
         peripheries=2 from a replaced instance node are included via their
         cluster attribute.
@@ -165,17 +165,16 @@ class DFAExecutor:
 
         for symbol in input_string:
             # Chain nested calls: if current is an RC node (or lands on one after
-            # entering a subroutine), keep entering subroutines until we reach a
+            # entering a subcomponent), keep entering subcomponents until we reach a
             # plain state that can take a normal transition.
             while 'RC' in str(current):
-                subroutine_start = self._get_subroutine_entry(current)
-                if subroutine_start:
+                subcomponent_start = self._get_subcomponent_entry(current)
+                if subcomponent_start:
                     stack.append(current)
-                    current = subroutine_start
+                    current = subcomponent_start
                     trace.append(f"  CALL {current} (stack depth: {len(stack)})")
                 else:
                     break
-
             next_node = self._take_transition(current, symbol)
 
             if next_node is None:
@@ -183,7 +182,7 @@ class DFAExecutor:
                     # Pop through transparent RC frames (empty dispatch_map) until
                     # a frame can dispatch, or the stack is exhausted.
                     # An RC node with an empty dispatch is a "tail-call" node:
-                    # the called subroutine absorbed all continuation routing,
+                    # the called subcomponent absorbed all continuation routing,
                     # so the return propagates directly to the outer caller.
                     dispatched = False
                     while stack:
@@ -196,7 +195,7 @@ class DFAExecutor:
                         else:
                             trace.append(f"  (return through {rc_node})")
                             # If the RC node itself is a frontier of its parent
-                            # subroutine (peripheries=2), it becomes the new
+                            # subcomponent (peripheries=2), it becomes the new
                             # current frontier point for the outer caller.
                             if self._is_frontier(rc_node):
                                 current = rc_node
@@ -211,16 +210,16 @@ class DFAExecutor:
             current = next_node
             trace.append(f"  '{symbol}' → {current}")
 
-        # If input ends on an RC node, follow epsilon CALLs into subroutines.
+        # If input ends on an RC node, follow epsilon CALLs into subcomponents.
         # This may chain: RC_outer → SUB_x_0 → RC_inner → SUB_y_0 → ...
         # We stop when the current node is no longer an RC node.
         # Acceptance is decided by originally_accepting on the final node reached.
         while 'RC' in str(current):
-            subroutine_start = self._get_subroutine_entry(current)
-            if not subroutine_start:
+            subcomponent_start = self._get_subcomponent_entry(current)
+            if not subcomponent_start:
                 break
             stack.append(current)
-            current = subroutine_start
+            current = subcomponent_start
             trace.append(f"  CALL {current} (stack depth: {len(stack)}) [end-of-input]")
 
         current = self._follow_epsilon_to_accepting(current)
@@ -270,8 +269,8 @@ class DFAExecutor:
 
         return None
 
-    def _get_subroutine_entry(self, rc_node: str) -> Optional[str]:
-        """Find the entry node of the subroutine associated with this RC node."""
+    def _get_subcomponent_entry(self, rc_node: str) -> Optional[str]:
+        """Find the entry node of the subcomponent associated with this RC node."""
         nd = self.G.nodes.get(rc_node, {})
         label = str(nd.get('label', '')).strip().strip('"').strip("'")
         if not label.startswith('RC:'):

@@ -6,14 +6,14 @@ from approaches.shared.shared_types import MatchLocation, BlueprintSubstructure
 
 
 # ---------------------------------------------------------------------------
-# BUILD SUBROUTINE
+# BUILD SUBCOMPONENT
 # ---------------------------------------------------------------------------
 
-def _create_subroutine_structure(G: nx.MultiDiGraph,
+def _create_subcomponent_structure(G: nx.MultiDiGraph,
                                  sub: BlueprintSubstructure,
                                  sub_id: int) -> Tuple[str, Dict[str, str]]:
     """
-    Builds the abstract subroutine in G based on the BlueprintSubstructure.
+    Builds the abstract subcomponent in G based on the BlueprintSubstructure.
 
     sub_mapping: blueprint_node_name → SUB_{sub_id}_{j}
     blueprint_nodes[0] is guaranteed to be the entry node (BFS-order from analyze.py).
@@ -91,7 +91,7 @@ def _process_exits(G: nx.MultiDiGraph,
                     instance_mapping: Dict[str, str],
                     rc_id: str):
     """
-    Handles transitions that exit the subroutine.
+    Handles transitions that exit the subcomponent.
     Iterates over loc.frontiers — nodes with external outgoing edges.
 
     Edge label strategy:
@@ -148,7 +148,7 @@ def _replace_instance_with_rc(G: nx.MultiDiGraph,
                                 loc: MatchLocation,
                                 sub_name: str,
                                 instance_mapping: Dict[str, str]):
-    """Replaces one instance of the subroutine with an RC node."""
+    """Replaces one instance of the subcomponent with an RC node."""
     rc_id = f"RC_{loc.start_node}"
 
     if not G.has_node(rc_id):
@@ -168,7 +168,7 @@ def _replace_instance_with_rc(G: nx.MultiDiGraph,
 
     _process_exits(G, loc, instance_mapping, rc_id)
 
-    # A nested RC node is only a frontier of its parent subroutine if
+    # A nested RC node is only a frontier of its parent subcomponent if
     # at least one of the replaced instance-nodes was already a frontier
     # (peripheries=2). The RC node then takes over the frontier role of that node.
     #
@@ -206,8 +206,8 @@ def _update_dispatch_maps(G: nx.MultiDiGraph,
     Additionally, if frontier_key_replacements is provided (used in second-run
     factorization of blueprint nodes), it updates dispatch_map KEYS across ALL
     RC nodes. This is needed when frontier SUB blueprint nodes are removed and
-    replaced by nodes from a new inner subroutine: the callers of the outer
-    subroutine need their frontier-key references updated to the new SUB nodes.
+    replaced by nodes from a new inner subcomponent: the callers of the outer
+    subcomponent need their frontier-key references updated to the new SUB nodes.
     """
     for node in rc_nodes_with_dispatch:
         data = G.nodes[node]
@@ -243,7 +243,7 @@ def _update_dispatch_maps(G: nx.MultiDiGraph,
                                            label=old_edge_label, key=k)
 
     # Update dispatch_map KEYS for all RC nodes when blueprint frontier nodes were
-    # removed and replaced by nodes from a new inner subroutine (second-run case).
+    # removed and replaced by nodes from a new inner subcomponent (second-run case).
     if frontier_key_replacements:
         for node, node_data in G.nodes(data=True):
             if 'dispatch_map' not in node_data:
@@ -320,16 +320,16 @@ def _filter_locations(G: nx.MultiDiGraph,
                   sub: BlueprintSubstructure,
                   sub_mapping: Dict[str, str],
                   processed_nodes: Set[str],
-                  dispatch_signatures: Optional[Dict[str, Dict[str, Dict[str, str]]]] = None) -> Tuple[List, bool]:
+                  dispatch_signatures: Optional[Dict[str, Dict[str, Dict[str, str]]]] = None) -> List:
     """
-    Filters the locations of a subroutine pattern. Invalid or overlapping
+    Filters the locations of a subcomponent pattern. Invalid or overlapping
     locations are skipped; the rest are tried.
 
-    dispatch_signatures check: two locations may only be merged if no RC node
-    exists that references both ref_node and cand_node (at the same canonical
-    position) as frontier keys for the same label with different targets. In
-    that case merging would corrupt the exit paths of that RC node. Nodes
-    referenced by different RC nodes are always safe to merge.
+    dispatch_signatures check: a location is rejected if an outer RC node
+    references two or more nodes from that same location as frontier keys for
+    the same label but with different targets. Replacing them with a single RC
+    node would collapse those distinct exit paths into one, corrupting the
+    dispatch map of that outer RC node.
     """
     valid = []
     nodes_in_batch: Set[str] = set()
@@ -343,14 +343,10 @@ def _filter_locations(G: nx.MultiDiGraph,
         if not _is_valid_entry_structure(G, loc.start_node, loc_nodes):
             continue
 
-        # Intra-instance dispatch-conflict check: if an outer RC node uses two or more
-        # nodes from THIS location as frontier keys for the same label but with
-        # DIFFERENT targets, replacing them with a single RC node would lose that
-        # distinction. Such a location must be skipped.
         if dispatch_signatures is not None:
             intra_conflict = False
             for rc_node_map in dispatch_signatures.values():
-                for label, frontier_to_target in rc_node_map.items():
+                for _, frontier_to_target in rc_node_map.items():
                     # Collect all targets for nodes in this location
                     targets_in_loc = {
                         n: t for n, t in frontier_to_target.items()
@@ -367,7 +363,7 @@ def _filter_locations(G: nx.MultiDiGraph,
         valid.append((loc, _build_instance_mapping(loc, sub_mapping)))
         nodes_in_batch.update(loc_nodes)
 
-    return valid, True  # group always valid; commit decision is via len(valid) >= 2
+    return valid
 
 
 # ---------------------------------------------------------------------------
@@ -405,11 +401,11 @@ def apply_factorization(G: nx.MultiDiGraph,
         sub_mapping = {node: f"SUB_{sub_id}_{j}"
                        for j, node in enumerate(sub.blueprint_nodes)}
 
-        valid_locations, is_group_valid = _filter_locations(
+        valid_locations = _filter_locations(
             G, sub, sub_mapping, processed_nodes, dispatch_signatures)
 
-        if is_group_valid and len(valid_locations) >= 2:
-            _create_subroutine_structure(G, sub, sub_id)
+        if len(valid_locations) >= 2:
+            _create_subcomponent_structure(G, sub, sub_id)
 
             for loc, instance_mapping in valid_locations:
                 rc_id = f"RC_{loc.start_node}"
@@ -420,12 +416,12 @@ def apply_factorization(G: nx.MultiDiGraph,
                 # Used to update dispatch_map KEYS in outer RC nodes: the old
                 # frontier keys (e.g. SUB_29_1, SUB_29_2) are replaced by the
                 # nested RC node (e.g. RC_SUB_29_1) which acts as the new
-                # frontier of the parent subroutine.
+                # frontier of the parent subcomponent.
                 for loc_node in loc.all_nodes:
                     frontier_key_replacements[loc_node] = rc_id
 
                 # Separate mapping used to propagate peripheries=2 to the
-                # blueprint SUB nodes of the inner subroutine.  These nodes
+                # blueprint SUB nodes of the inner subcomponent. These nodes
                 # inherited their frontier status from the blueprint nodes they
                 # replaced, but _process_exits cannot detect it (blueprint nodes
                 # have no graph-level external edges — those live in dispatch_maps).
@@ -438,7 +434,7 @@ def apply_factorization(G: nx.MultiDiGraph,
                 nodes_to_remove.update(loc.all_nodes)
                 processed_nodes.update(loc.all_nodes)
 
-    # Propagate peripheries=2 to the blueprint SUB nodes of inner subroutines.
+    # Propagate peripheries=2 to the blueprint SUB nodes of inner subcomponents.
     # Blueprint nodes have no graph-level external edges (those are in dispatch_maps),
     # so _process_exits cannot mark them as frontiers. We recover the frontier
     # status from the original SUB nodes they replaced.
