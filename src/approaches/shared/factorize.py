@@ -13,7 +13,7 @@ def _create_subcomponent_structure(G: nx.MultiDiGraph,
                                  sub: BlueprintSubstructure,
                                  sub_id: int) -> Tuple[str, Dict[str, str]]:
     """
-    Builds the abstract subcomponent in G based on the BlueprintSubstructure.
+    Builds the subcomponent in G based on the BlueprintSubstructure.
 
     sub_mapping: blueprint_node_name → SUB_{sub_id}_{j}
     blueprint_nodes[0] is guaranteed to be the entry node (BFS-order from analyze.py).
@@ -54,9 +54,9 @@ def _is_accepting_node(G: nx.MultiDiGraph, node: str) -> bool:
     """
     Returns True if the node was an accepting state in G.
     If the node was already tagged by a previous factorization run (via the
-    'originally_accepting' attribute), that value is used directly — this
-    prevents peripheries=2 frontier markers from being misread as accepting
-    states during the second run.
+    'originally_accepting' attribute), that value is used directly. 
+    Otherwise, the 'shape' attribute is checked for 'doublecircle' to determine accepting status.
+    Or peripheries=2 is also accepted as an alternative marker for accepting states.
     """
     nd = G.nodes[node]
     oa = nd.get('originally_accepting')
