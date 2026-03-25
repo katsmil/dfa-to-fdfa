@@ -1,16 +1,17 @@
 import networkx as nx
 from collections import deque
-from typing import Dict, Tuple, List, Optional, Set, Any
-from approaches.shared.shared_types import BlueprintEdge
+from typing import Dict, Tuple, List, Optional, Set
+
+from approaches.shared.shared_types import BlueprintEdge, SubstructureMatch
+from approaches.shared.shared_utils import get_internals_and_frontiers
+
 
 class BaseSubstructureAnalyzer:
     """
     Shared BFS core for bisimilarity analysis.
-
-    Subclasses must implement:
-      - _build_match_output(...) → determines the return type (SubstructureMatch or dict)
-
-    The full BFS loop, validation, and blueprint construction live here and are NOT overridden.
+    Subclasses may extend __init__ (for example, to add EquivalenceClosure)
+    The full BFS loop, validation, blueprint construction, and match output all
+    live here and are not intended to be overridden.
     """
 
     def __init__(self, G: nx.MultiDiGraph, min_overlap: int = 2):
@@ -34,7 +35,7 @@ class BaseSubstructureAnalyzer:
     def _get_node_signature(self, node: str) -> tuple:
         """
         Returns a tuple (is_accepting, sorted_edges) used to compare two nodes for bisimilarity.
-        Accepting is determined by 'shape' == 'doublecircle'. Shared by all subclasses.
+        Accepting is determined by 'shape' == 'doublecircle'.
         """
         if node not in self._sig_cache:
             is_accepting = self.G.nodes[node].get('shape') == 'doublecircle'
@@ -44,17 +45,43 @@ class BaseSubstructureAnalyzer:
         return self._sig_cache[node]
 
     # ------------------------------------------------------------------
-    # BFS CORE  (shared, not to be overridden)
+    # MATCH OUTPUT
     # ------------------------------------------------------------------
 
-    def _find_maximal_overlap(self, start_a: str, start_b: str) -> Optional[Any]:
+    def _build_match_output(self, start_a: str, start_b: str,
+                             visited_pairs: List[Tuple[str, str]],
+                             blueprint_edges: List[BlueprintEdge]) -> SubstructureMatch:
+        nodes_a = tuple(n1 for n1, _ in visited_pairs)
+        nodes_b = tuple(n2 for _, n2 in visited_pairs)
+
+        internals_a, frontiers_a = get_internals_and_frontiers(self, nodes_a)
+        internals_b, frontiers_b = get_internals_and_frontiers(self, nodes_b)
+
+        return SubstructureMatch(
+            start_nodes=(start_a, start_b),
+            overlap_size=len(visited_pairs),
+            internals_a=internals_a,
+            frontiers_a=frontiers_a,
+            internals_b=internals_b,
+            frontiers_b=frontiers_b,
+            all_pairs=frozenset(visited_pairs),
+            nodes_a_ordered=nodes_a,
+            nodes_b_ordered=nodes_b,
+            blueprint_edges=tuple(blueprint_edges),
+        )
+
+    # ------------------------------------------------------------------
+    # BFS CORE
+    # ------------------------------------------------------------------
+
+    def _find_maximal_overlap(self, start_a: str, start_b: str) -> Optional[SubstructureMatch]:
         if start_a == start_b:
             return None
 
         queue = deque([(start_a, start_b)])
         visited_pairs: List[Tuple[str, str]] = []
-        pair_mapping: Dict[str, str] = {}   # a → b
-        reverse_mapping: Dict[str, str] = {}  # b → a
+        pair_mapping: Dict[str, str] = {}    # a → b
+        reverse_mapping: Dict[str, str] = {} # b → a
         nodes_in_a: Set[str] = set()
         nodes_in_b: Set[str] = set()
 
@@ -127,12 +154,3 @@ class BaseSubstructureAnalyzer:
         })
 
         return self._build_match_output(start_a, start_b, visited_pairs, blueprint_edges)
-
-    # ------------------------------------------------------------------
-    # ABSTRACT  (subclass must implement)
-    # ------------------------------------------------------------------
-
-    def _build_match_output(self, start_a: str, start_b: str,
-                             visited_pairs: List[Tuple[str, str]],
-                             blueprint_edges: List[BlueprintEdge]) -> Any:
-        raise NotImplementedError

@@ -3,37 +3,8 @@ from collections import defaultdict
 from typing import List, Tuple, Dict, Set
 
 from approaches.shared.base_analyzer import BaseSubstructureAnalyzer
-from approaches.shared.shared_types import MatchLocation, BlueprintSubstructure, BlueprintEdge
-from approaches.shared.shared_utils import count_non_overlapping_locations, get_internals_and_frontiers, build_signature_buckets
-
-# ---------------------------------------------------------------------------
-# ANALYSIS ENGINE
-# ---------------------------------------------------------------------------
-
-class SubstructureAnalyzer(BaseSubstructureAnalyzer):
-    """
-    Minimal subclass for the NoEquivalenceClosure approach.
-    This variant aims to maximize net gain compression.
-    """
-
-    def _build_match_output(self, start_a, start_b, visited_pairs, blueprint_edges):
-        nodes_a = tuple(p[0] for p in visited_pairs)
-        nodes_b = tuple(p[1] for p in visited_pairs)
-
-        internals_a, frontiers_a = get_internals_and_frontiers(self, nodes_a)
-        internals_b, frontiers_b = get_internals_and_frontiers(self, nodes_b)
-
-        return {
-            'start_a': start_a,
-            'start_b': start_b,
-            'nodes_a': nodes_a,
-            'nodes_b': nodes_b,
-            'internals_a': internals_a,
-            'frontiers_a': frontiers_a,
-            'internals_b': internals_b,
-            'frontiers_b': frontiers_b,
-            'blueprint_edges': blueprint_edges,
-        }
+from approaches.shared.shared_types import MatchLocation, BlueprintSubstructure, BlueprintEdge, SubstructureMatch
+from approaches.shared.shared_utils import count_non_overlapping_locations, build_signature_buckets
 
 # ---------------------------------------------------------------------------
 # ENTRY POINT
@@ -44,7 +15,7 @@ def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[BlueprintSubstru
     Find repeating substructures in G and group them by blueprint topology.
     Returns a list of unique BlueprintSubstructure objects, sorted by compression potential.
     """
-    analyzer = SubstructureAnalyzer(G, min_overlap=min_size)
+    analyzer = BaseSubstructureAnalyzer(G, min_overlap=min_size)
     buckets = build_signature_buckets(analyzer)
 
     # structure_registry: group all found locations by their blueprint topology (edges_tuple)
@@ -58,34 +29,34 @@ def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[BlueprintSubstru
     for nodes in buckets.values():
         for i in range(len(nodes)):
             for j in range(i + 1, len(nodes)):
-                match = analyzer._find_maximal_overlap(nodes[i], nodes[j])
+                match: SubstructureMatch = analyzer._find_maximal_overlap(nodes[i], nodes[j])
                 if not match:
                     continue
 
                 # edges_tuple identifies the blueprint topology (structure, not node names)
                 edges_tuple = tuple(sorted(
                     (e.source_idx, e.target_idx, e.label)
-                    for e in match['blueprint_edges']
+                    for e in match.blueprint_edges
                 ))
 
                 # Add both A- and B-side locations to the registry for this blueprint
                 structure_registry[edges_tuple].add(MatchLocation(
-                    start_node=match['start_a'],
-                    all_nodes=match['nodes_a'],
-                    internals=match['internals_a'],
-                    frontiers=match['frontiers_a'],
+                    start_node=match.start_nodes[0],
+                    all_nodes=match.nodes_a_ordered,
+                    internals=match.internals_a,
+                    frontiers=match.frontiers_a,
                 ))
                 structure_registry[edges_tuple].add(MatchLocation(
-                    start_node=match['start_b'],
-                    all_nodes=match['nodes_b'],
-                    internals=match['internals_b'],
-                    frontiers=match['frontiers_b'],
+                    start_node=match.start_nodes[1],
+                    all_nodes=match.nodes_b_ordered,
+                    internals=match.internals_b,
+                    frontiers=match.frontiers_b,
                 ))
 
                 # Store the blueprint structure and node order (only once per blueprint)
                 if edges_tuple not in blueprint_store:
-                    blueprint_store[edges_tuple] = tuple(match['blueprint_edges'])
-                    blueprint_nodes_store[edges_tuple] = match['nodes_a']
+                    blueprint_store[edges_tuple] = match.blueprint_edges
+                    blueprint_nodes_store[edges_tuple] = match.nodes_a_ordered
 
     results = []
     # Build BlueprintSubstructure objects for each unique blueprint
@@ -99,7 +70,7 @@ def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[BlueprintSubstru
         ))
 
     eff = count_non_overlapping_locations
-    
+
     # Sort by (overlap_size * non-overlapping locations), descending
     return sorted(
         results,
