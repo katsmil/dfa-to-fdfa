@@ -50,7 +50,8 @@ class EquivalenceClosure:
 
 class SubstructureAnalyzer(BaseSubstructureAnalyzer):
     """
-    Version 1: uses EquivalenceClosure
+    Extends the base analyzer with an EquivalenceClosure to avoid re-matching already-paired nodes.
+    This variant aims to maximize runtime.
     """
 
     def __init__(self, G: nx.DiGraph, min_overlap: int = 1):
@@ -63,7 +64,10 @@ class SubstructureAnalyzer(BaseSubstructureAnalyzer):
 
         for n1, n2 in visited_pairs:
             has_external = any(t not in nodes_in_a for t in self._get_edges_cached(n1).values())
-            (frontiers if has_external else internals).add((n1, n2))
+            if has_external:
+                frontiers.add((n1, n2))
+            else:
+                internals.add((n1, n2))
         
         return SubstructureMatch(
             start_nodes=(start_a, start_b),
@@ -81,8 +85,17 @@ class SubstructureAnalyzer(BaseSubstructureAnalyzer):
 # ---------------------------------------------------------------------------
 
 def _aggregate_blueprint_results(matches: List[SubstructureMatch]) -> List[BlueprintSubstructure]:
+    """
+    Combine all raw matches into unique blueprint substructures with their concrete locations.
+
+    Steps:
+    1. Group matches by their blueprint topology (edges_tuple).
+    2. For each group, deduplicate locations (by node set) and collect all unique occurrences.
+    3. Return a BlueprintSubstructure for each unique blueprint, with all its locations.
+    """
     structure_registry: Dict[tuple, List[SubstructureMatch]] = defaultdict(list)
 
+    # 1. Group matches by blueprint topology (edges_tuple)
     for m in matches:
         edges_tuple = tuple(sorted(
             (e.source_idx, e.target_idx, e.label) for e in m.blueprint_edges
@@ -99,6 +112,7 @@ def _aggregate_blueprint_results(matches: List[SubstructureMatch]) -> List[Bluep
         locations = []
 
         def _add_location(start, nodes, internals, frontiers):
+            # Deduplicate locations: only add if node set has not been seen yet
             key = tuple(sorted(nodes))
             if key not in seen_location_keys:
                 seen_location_keys.add(key)
@@ -109,6 +123,7 @@ def _aggregate_blueprint_results(matches: List[SubstructureMatch]) -> List[Bluep
                     frontiers=frontiers,
                 ))
 
+        # 2. For each match, add both the A- and B-side as a location (if unique)
         for m in related_matches:
             pair_map = {n1: n2 for n1, n2 in m.all_pairs}
             a_nodes = list(m.nodes_a_ordered)
@@ -129,6 +144,7 @@ def _aggregate_blueprint_results(matches: List[SubstructureMatch]) -> List[Bluep
                 [n for n in b_nodes if n in b_fro],
             )
 
+        # 3. Create the blueprint object with all unique locations
         final_results.append(BlueprintSubstructure(
             blueprint_nodes=blueprint_nodes,
             overlap_size=len(blueprint_nodes),
@@ -144,8 +160,24 @@ def _calculate_savings(sub: BlueprintSubstructure) -> int:
 
 
 def _prioritize_candidates(candidates: List[BlueprintSubstructure]) -> List[BlueprintSubstructure]:
-    scored = [(_calculate_savings(s), s) for s in candidates if _calculate_savings(s) > 0]
+    """
+    Filter and sort blueprint candidates by their savings and overlap size.
+    Only candidates with positive savings are kept.
+    The returned list is sorted in descending order of compression result (savings),
+    so the most beneficial blueprint is first.
+    If savings are equal, larger overlap_size comes first.
+    """
+    # 1. Compute savings for each candidate
+    scored = []
+    for s in candidates:
+        savings = _calculate_savings(s)
+        if savings > 0:
+            scored.append((savings, s))
+
+    # 2. Sort by (savings, overlap_size), descending
     scored.sort(key=lambda x: (x[0], x[1].overlap_size), reverse=True)
+
+    # 3. Return only the BlueprintSubstructure objects, in order of compression result (best first)
     return [s for _, s in scored]
 
 # ---------------------------------------------------------------------------

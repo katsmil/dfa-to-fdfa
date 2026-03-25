@@ -99,6 +99,16 @@ def _process_exits(G: nx.MultiDiGraph,
     - If only a subset of frontier nodes can trigger it: append [SUB_x_y, ...]
       to make the context-dependency visible.
     The RC node label is NOT modified — dispatch info lives on the edges.
+
+    The resulting dispatch_map has the structure:
+        { label: { SUB_x_y: target_node, ... }, ... }
+    Example:
+        {
+            "a": {"SUB_0_1": "q5", "SUB_0_2": "q7"},
+            "b": {"SUB_0_1": "q3"}
+        }
+    Here "a" is triggered by two frontier nodes going to different targets,
+    "b" only by SUB_0_1 — which causes a [SUB_0_1] annotation on that edge.
     """
     dispatch_map = defaultdict(dict)
     instance_nodes = set(loc.all_nodes)
@@ -148,7 +158,7 @@ def _replace_instance_with_rc(G: nx.MultiDiGraph,
                                 loc: MatchLocation,
                                 sub_name: str,
                                 instance_mapping: Dict[str, str]):
-    """Replaces one instance of the subcomponent with an RC node."""
+    """Replaces one instance of the substructure with an RC node."""
     rc_id = f"RC_{loc.start_node}"
 
     if not G.has_node(rc_id):
@@ -161,6 +171,7 @@ def _replace_instance_with_rc(G: nx.MultiDiGraph,
             # peripheries=2 is only set after _process_exits (see below).
         G.add_node(rc_id, **rc_attrs)
 
+    # Redirect incoming edges from outside the instance to the RC node.
     instance_nodes = set(loc.all_nodes)
     for u, v, data in list(G.in_edges(loc.start_node, data=True)):
         if u not in instance_nodes:
@@ -168,13 +179,8 @@ def _replace_instance_with_rc(G: nx.MultiDiGraph,
 
     _process_exits(G, loc, instance_mapping, rc_id)
 
-    # A nested RC node is only a frontier of its parent subcomponent if
-    # at least one of the replaced instance-nodes was already a frontier
-    # (peripheries=2). The RC node then takes over the frontier role of that node.
-    #
-    # Note: if the dispatch target of this RC node is a frontier, the
-    # RC node itself is NOT a frontier — control returns to the caller
-    # from that frontier node, not from the RC node.
+    # If nested inside a parent subcomponent, inherit frontier status from
+    # any replaced instance node that was itself a frontier (peripheries=2).
     parent_cluster = G.nodes[rc_id].get('cluster')
     if parent_cluster:
         for orig_node in loc.all_nodes:
@@ -346,7 +352,7 @@ def _filter_locations(G: nx.MultiDiGraph,
         if dispatch_signatures is not None:
             intra_conflict = False
             for rc_node_map in dispatch_signatures.values():
-                for _, frontier_to_target in rc_node_map.items():
+                for label, frontier_to_target in rc_node_map.items():
                     # Collect all targets for nodes in this location
                     targets_in_loc = {
                         n: t for n, t in frontier_to_target.items()
@@ -376,7 +382,7 @@ def apply_factorization(G: nx.MultiDiGraph,
     nodes_to_remove: Set[str] = set()
     replaced_by: Dict[str, str] = {}
     rc_nodes_with_dispatch: Set[str] = set()
-    frontier_key_replacements: Dict[str, str] = {}  # loc_node → rc_id  (dispatch_map key updates)
+    frontier_key_replacements: Dict[str, str] = {}  # instance node → RC node that replaced it (for updating dispatch_map keys in outer RC nodes)
     sub_node_peripheries: Dict[str, str] = {}       # loc_node → sub_node (peripheries propagation)
 
     dispatch_signatures: Optional[Dict[str, Dict[str, str]]] = _build_dispatch_signatures(G)
@@ -404,6 +410,7 @@ def apply_factorization(G: nx.MultiDiGraph,
         valid_locations = _filter_locations(
             G, sub, sub_mapping, processed_nodes, dispatch_signatures)
 
+        # Only factorize if the substructure occurs at least twice — otherwise there is nothing to compress.
         if len(valid_locations) >= 2:
             _create_subcomponent_structure(G, sub, sub_id)
 

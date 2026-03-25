@@ -19,8 +19,6 @@ class MatchLocation:
                    BlueprintSubstructure.blueprint_nodes
     - internals:   nodes with no outgoing external edges
     - frontiers:   nodes with at least one outgoing external edge
-
-    Tuple instead of List so MatchLocation is hashable (required for set usage in run_analysis).
     """
     start_node: str
     all_nodes: Tuple[str, ...]

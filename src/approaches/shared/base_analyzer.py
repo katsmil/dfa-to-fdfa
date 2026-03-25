@@ -7,9 +7,8 @@ class BaseSubstructureAnalyzer:
     """
     Shared BFS core for bisimilarity analysis.
 
-    Subclasses implement:
-      - get_node_signature(node) → if the signature needs extra info (e.g. accepting state)
-      - _build_match_output(...)  → determines the return type (SubstructureMatch or dict)
+    Subclasses must implement:
+      - _build_match_output(...) → determines the return type (SubstructureMatch or dict)
 
     The full BFS loop, validation, and blueprint construction live here and are NOT overridden.
     """
@@ -34,8 +33,8 @@ class BaseSubstructureAnalyzer:
 
     def _get_node_signature(self, node: str) -> tuple:
         """
-        Base implementation: accepting based on 'shape' == 'doublecircle'.
-        Subclass can override this to also include the 'accepting' attribute.
+        Returns a tuple (is_accepting, sorted_edges) used to compare two nodes for bisimilarity.
+        Accepting is determined by 'shape' == 'doublecircle'. Shared by all subclasses.
         """
         if node not in self._sig_cache:
             is_accepting = self.G.nodes[node].get('shape') == 'doublecircle'
@@ -54,7 +53,6 @@ class BaseSubstructureAnalyzer:
 
         queue = deque([(start_a, start_b)])
         visited_pairs: List[Tuple[str, str]] = []
-        pair_set: Set[Tuple[str, str]] = set()
         pair_mapping: Dict[str, str] = {}   # a → b
         reverse_mapping: Dict[str, str] = {}  # b → a
         nodes_in_a: Set[str] = set()
@@ -62,7 +60,7 @@ class BaseSubstructureAnalyzer:
 
         while queue:
             n1, n2 = queue.popleft()
-            if (n1, n2) in pair_set:
+            if n1 in pair_mapping:
                 continue
             if n1 == n2:
                 continue
@@ -104,9 +102,8 @@ class BaseSubstructureAnalyzer:
                     if t_a is not None and t_b is not None and t_b in nodes_in_b:
                         return None
 
-            # Accepteer paar
+            # Accept pair
             visited_pairs.append((n1, n2))
-            pair_set.add((n1, n2))
             pair_mapping[n1] = n2
             reverse_mapping[n2] = n1
             nodes_in_a.add(n1)
