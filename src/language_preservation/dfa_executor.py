@@ -204,7 +204,10 @@ class DFAExecutor:
                         trace.append(f"  REJECT: δret(..., {current}, '{symbol}') undefined on all stack frames")
                         return False, "\n".join(trace)
                 else:
-                    trace.append(f"  REJECT: δint({current}, '{symbol}') undefined, no return possible")
+                    trace.append(
+                        f"  REJECT: δint({current}, '{symbol}') undefined "
+                        f"(no internal transition; not at frontier)"
+                    )
                     return False, "\n".join(trace)
 
             current = next_node
