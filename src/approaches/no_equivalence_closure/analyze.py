@@ -14,15 +14,25 @@ def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[BlueprintSubstru
     """
     Find repeating substructures in G and group them by blueprint topology.
     Returns a list of unique BlueprintSubstructure objects, sorted by compression potential.
+    This variant does exhaustive matching (no equivalence pruning), which typically
+    yields higher compression at the cost of runtime.
     """
     analyzer = BaseSubstructureAnalyzer(G, min_overlap=min_size)
     buckets = build_signature_buckets(analyzer)
 
     # structure_registry: group all found locations by their blueprint topology (edges_tuple)
     structure_registry: Dict[tuple, Set[MatchLocation]] = defaultdict(set)
-    # blueprint_store: stores the edge structure (as BlueprintEdge tuples) for each blueprint
+    # blueprint_store: stores the edge structure for each blueprint key
+    # Example key (edges_tuple) from input/miscellaneous/bigSmall.dot:
+    #   ((0, 1, "1"), (1, 2, "2"), (2, 3, "3"))
+    # Example value (Tuple[BlueprintEdge, ...]):
+    #   (BlueprintEdge(0, 1, "1"), BlueprintEdge(1, 2, "2"), BlueprintEdge(2, 3, "3"))
     blueprint_store: Dict[tuple, Tuple[BlueprintEdge, ...]] = {}
     # blueprint_nodes_store: stores the node names (as tuple) for each blueprint
+    # Example key (edges_tuple) from input/miscellaneous/bigSmall.dot:
+    #   ((0, 1, "1"), (1, 2, "2"), (2, 3, "3"))
+    # Example value (Tuple[str, ...]):
+    #   ("a1", "a2", "a3", "c1")
     blueprint_nodes_store: Dict[tuple, Tuple[str, ...]] = {}
 
     # For each bucket (signature group), compare all pairs to find maximal overlaps
