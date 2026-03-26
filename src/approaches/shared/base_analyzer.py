@@ -36,6 +36,7 @@ class BaseSubstructureAnalyzer:
         """
         Returns a tuple (is_accepting, sorted_edges) used to compare two nodes for bisimilarity.
         Accepting is determined by 'shape' == 'doublecircle'.
+        A self-loop vs. non-self target produces a different signature.
         """
         if node not in self._sig_cache:
             is_accepting = self.G.nodes[node].get('shape') == 'doublecircle'
@@ -49,22 +50,22 @@ class BaseSubstructureAnalyzer:
     # ------------------------------------------------------------------
 
     def _build_match_output(self, start_a: str, start_b: str,
-                             visited_pairs: List[Tuple[str, str]],
+                             matched_pairs: List[Tuple[str, str]],
                              blueprint_edges: List[BlueprintEdge]) -> SubstructureMatch:
-        nodes_a = tuple(n1 for n1, _ in visited_pairs)
-        nodes_b = tuple(n2 for _, n2 in visited_pairs)
+        nodes_a = tuple(n1 for n1, _ in matched_pairs)
+        nodes_b = tuple(n2 for _, n2 in matched_pairs)
 
         internals_a, frontiers_a = get_internals_and_frontiers(self, nodes_a)
         internals_b, frontiers_b = get_internals_and_frontiers(self, nodes_b)
 
         return SubstructureMatch(
             start_nodes=(start_a, start_b),
-            overlap_size=len(visited_pairs),
+            overlap_size=len(matched_pairs),
             internals_a=internals_a,
             frontiers_a=frontiers_a,
             internals_b=internals_b,
             frontiers_b=frontiers_b,
-            all_pairs=frozenset(visited_pairs),
+            all_pairs=frozenset(matched_pairs),
             nodes_a_ordered=nodes_a,
             nodes_b_ordered=nodes_b,
             blueprint_edges=tuple(blueprint_edges),
@@ -79,7 +80,7 @@ class BaseSubstructureAnalyzer:
             return None
 
         queue = deque([(start_a, start_b)])
-        visited_pairs: List[Tuple[str, str]] = []
+        matched_pairs: List[Tuple[str, str]] = []
         pair_mapping: Dict[str, str] = {}    # a → b
         reverse_mapping: Dict[str, str] = {} # b → a
         nodes_in_a: Set[str] = set()
@@ -87,19 +88,23 @@ class BaseSubstructureAnalyzer:
 
         while queue:
             n1, n2 = queue.popleft()
-            if n1 in pair_mapping:
+            # Skip pairs that reuse an already-matched node on either side.
+            if n1 in pair_mapping or n2 in reverse_mapping:
                 continue
+            # Reject identical nodes (self-pair).
             if n1 == n2:
                 continue
+            # Prevent crossing: a node from one side can't map into the other side's set.
             if n1 in nodes_in_b or n2 in nodes_in_a:
                 return None
+            # Must have identical signatures to be comparable.
             if self._get_node_signature(n1) != self._get_node_signature(n2):
                 continue
 
             e1 = self._get_edges_cached(n1)
             e2 = self._get_edges_cached(n2)
 
-            # Incoming validation
+            # Incoming validation (part of partial isomorphism check))
             for pred_a in self.G.predecessors(n1):
                 if pred_a in pair_mapping:
                     pred_b = pair_mapping[pred_a]
@@ -114,7 +119,7 @@ class BaseSubstructureAnalyzer:
                         if target_b == n2 and self._get_edges_cached(pred_a).get(label) != n1:
                             return None
 
-            # Outgoing validation
+            # Outgoing validation: preserve labeled outgoing structure (part of partial isomorphism check).
             for label in set(e1.keys()) | set(e2.keys()):
                 t_a = e1.get(label)
                 t_b = e2.get(label)
@@ -125,12 +130,9 @@ class BaseSubstructureAnalyzer:
                 if is_internal_a:
                     if t_b != pair_mapping.get(t_a):
                         return None
-                else:
-                    if t_a is not None and t_b is not None and t_b in nodes_in_b:
-                        return None
 
             # Accept pair
-            visited_pairs.append((n1, n2))
+            matched_pairs.append((n1, n2))
             pair_mapping[n1] = n2
             reverse_mapping[n2] = n1
             nodes_in_a.add(n1)
@@ -140,17 +142,17 @@ class BaseSubstructureAnalyzer:
                 if label in e2:
                     queue.append((e1[label], e2[label]))
 
-        if len(visited_pairs) < self.min_overlap:
+        if len(matched_pairs) < self.min_overlap:
             return None
 
         # Blueprint edges
-        nodes_a = [p[0] for p in visited_pairs]
+        nodes_a = [p[0] for p in matched_pairs]
         node_to_idx = {node: i for i, node in enumerate(nodes_a)}
         blueprint_edges = list({
             BlueprintEdge(i, node_to_idx[t_a], label)
-            for i, (u_a, _) in enumerate(visited_pairs)
+            for i, (u_a, _) in enumerate(matched_pairs)
             for label, t_a in self._get_edges_cached(u_a).items()
             if t_a in node_to_idx
         })
 
-        return self._build_match_output(start_a, start_b, visited_pairs, blueprint_edges)
+        return self._build_match_output(start_a, start_b, matched_pairs, blueprint_edges)

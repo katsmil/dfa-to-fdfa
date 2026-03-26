@@ -58,8 +58,8 @@ class BlueprintSubstructure:
     The blueprint of a subcomponent.
 
     - blueprint_nodes[0] is ALWAYS the entry node (BFS-order of first match)
-    - blueprint_edges describes the topology as indices into blueprint_nodes,
-      independent of concrete node names
+    - blueprint_edges uses indices into blueprint_nodes (0,1,2,...) instead of
+      concrete node names, so the structure is reusable across instances
     """
     blueprint_nodes: Tuple[str, ...]
     overlap_size: int
