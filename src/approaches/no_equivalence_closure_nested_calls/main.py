@@ -10,8 +10,8 @@ def factorize(G: nx.MultiDiGraph) -> nx.MultiDiGraph:
     """
     2-pass factorization (nested calls):
       Pass 1 — factorize the full original graph.
-      Pass 2 — find common patterns within the generated SUB_* blueprints
-               and factorize those as well.
+      Pass 2 — run analysis only on the subgraph restricted to SUB_* nodes
+               (only the created subcomponents).
     """
     G = G.copy()
 
