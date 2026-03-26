@@ -49,23 +49,21 @@ def _extract_labeled_transitions(G: nx.MultiDiGraph) -> Dict[str, Dict[str, str]
                 table[u][sym] = v
     return table
 
-
-def _bfs_shortest_paths(G: nx.MultiDiGraph,
-                         table: Dict[str, Dict[str, str]],
-                         start: str) -> Dict[str, List[str]]:
+def _resolve_epsilon_targets(G: nx.MultiDiGraph) -> Dict[str, str]:
     """
-    BFS from start; returns the shortest path to each reachable state
-    as a list of symbols.
+    Map each node to the first node reachable via only unlabeled edges that
+    has labeled outgoing edges (or to the last reachable node if none exist).
 
-    Epsilon transitions (no symbol in table) are followed without
-    adding a symbol to the path.
+    Example:
+      A -ε-> B -ε-> C -a-> D   =>   A->C, B->C, C->C
+      E -ε-> F  (no labeled out) =>   E->F, F->F
     """
-    # paths[node] = list of symbols to reach that node
-    paths: Dict[str, List[str]] = {start: []}
-    queue: deque = deque([start])
+    cache: Dict[str, str] = {}
 
-    def _epsilon_closure(node: str) -> str:
-        """Follow unlabeled edges; returns the first node with labeled outgoing edges."""
+    def resolve(node: str) -> str:
+        if node in cache:
+            return cache[node]
+
         visited = set()
         cur = node
         while cur not in visited:
@@ -74,6 +72,7 @@ def _bfs_shortest_paths(G: nx.MultiDiGraph,
                 data.get('label') for _, _, data in G.out_edges(cur, data=True)
             )
             if has_labeled:
+                cache[node] = cur
                 return cur
             for _, tgt, data in G.out_edges(cur, data=True):
                 if not data.get('label') and tgt not in visited:
@@ -81,9 +80,31 @@ def _bfs_shortest_paths(G: nx.MultiDiGraph,
                     break
             else:
                 break
+
+        cache[node] = cur
         return cur
 
-    real_start = _epsilon_closure(start)
+    for n in G.nodes():
+        resolve(n)
+
+    return cache
+
+
+def _bfs_shortest_paths(table: Dict[str, Dict[str, str]],
+                         start: str,
+                         epsilon_target_map: Dict[str, str]) -> Dict[str, List[str]]:
+    """
+    BFS from start; returns the shortest path to each reachable state
+    as a list of symbols.
+
+    Epsilon transitions do not consume input, so skipping them via the
+    precomputed target map must not append any symbol to the path.
+    """
+    # paths[node] = list of symbols to reach that node
+    paths: Dict[str, List[str]] = {start: []}
+    queue: deque = deque([start])
+
+    real_start = epsilon_target_map.get(start, start)
     if real_start != start:
         paths[real_start] = []
         queue.appendleft(real_start)
@@ -93,7 +114,7 @@ def _bfs_shortest_paths(G: nx.MultiDiGraph,
         current_path = paths[node]
 
         for sym, target in table.get(node, {}).items():
-            real_target = _epsilon_closure(target)
+            real_target = epsilon_target_map.get(target, target)
             if real_target not in paths:
                 paths[real_target] = current_path + [sym]
                 queue.append(real_target)
@@ -129,8 +150,7 @@ def _find_suffix_to_accept(node: str,
 
 def _find_suffix_to_reject(node: str,
                             table: Dict[str, Dict[str, str]],
-                            accepting: Set[str],
-                            all_nodes: Set[str]) -> Optional[List[str]]:
+                            accepting: Set[str]) -> Optional[List[str]]:
     """
     BFS from node; returns the shortest sequence of symbols leading to a
     non-accepting state, or a symbol for which no transition exists — both
@@ -142,8 +162,9 @@ def _find_suffix_to_reject(node: str,
         # Node itself is already rejecting
         return []
 
-    # Bereken het volledige alfabet eenmalig buiten de BFS-lus.
-    # (Niet per iteratie herberekenen — dat is O(states * transitions) per stap.)
+    # Compute the full alphabet once outside the BFS loop.
+    # This is necessary because we also want to check for missing transitions, e.g. non existing symbols in alphabet
+    # (Avoid recomputing per iteration)
     all_syms = set(sym for trans in table.values() for sym in trans.keys())
 
     visited: Dict[str, List[str]] = {node: []}
@@ -253,7 +274,8 @@ class TargetedLanguagePreservationTester:
         self._all_nodes = set(G_original.nodes())
 
         # Shortest paths from start to every reachable state
-        self._prefixes = _bfs_shortest_paths(G_original, self._table, self._start)
+        epsilon_target_map = _resolve_epsilon_targets(G_original)
+        self._prefixes = _bfs_shortest_paths(self._table, self._start, epsilon_target_map)
 
         # Alphabet = all symbols present in the transition table
         self.alphabet = sorted({
@@ -314,9 +336,7 @@ class TargetedLanguagePreservationTester:
                 all_cases.append(tc)
 
             # --- reject suffix ---
-            reject_suffix = _find_suffix_to_reject(
-                state, self._table, self._accepting, self._all_nodes
-            )
+            reject_suffix = _find_suffix_to_reject(state, self._table, self._accepting)
             if reject_suffix is not None:
                 tc = self._build_test_case(state, prefix, reject_suffix, 'reject', expected=False)
                 all_cases.append(tc)
@@ -327,7 +347,7 @@ class TargetedLanguagePreservationTester:
     def run_report(self, verbose: bool = False,
                    states: Optional[Set[str]] = None) -> Tuple[str, List[TestCase]]:
         """
-        Run all tests and return a human-readable report together with all test cases.
+        Run all tests and return a readable report together with all test cases.
 
         Args:
             verbose: if True, show the factored trace for passing tests as well;
@@ -435,7 +455,7 @@ def compare_graphs_on_string(G_original: nx.MultiDiGraph, G_factored: nx.MultiDi
     Args:
         G_original:   original DFA as a NetworkX MultiDiGraph
         G_factored:   factored DFA as a NetworkX MultiDiGraph
-        input_string: string like 'axxa' or a list of symbols ['a','x','x','a']
+        input_string: string like 'a x x a' or a list of symbols ['a','x','x','a']
         verbose:      print traces and results
 
     Returns:

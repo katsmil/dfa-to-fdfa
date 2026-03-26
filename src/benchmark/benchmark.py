@@ -2,14 +2,14 @@
 VARIANT-AGNOSTIC BENCHMARK SUITE
 =================================
 
-Dit framework test beide varianten (EquivalenceClosure en NoEquivalenceClosure)
-op dezelfde inputs en verzamelt objectieve metrics.
+This framework tests all variants (EquivalenceClosure, NoEquivalenceClosure, and NestedCalls)
+on the same inputs and collects metrics.
 """
 
 import time
 import networkx as nx
 from dataclasses import dataclass
-from typing import List, Dict, Tuple
+from typing import List, Tuple
 import json
 import sys
 import os
@@ -35,11 +35,11 @@ VARIANT_FACTORIZE = {
 }
 
 def count_real_nodes(G: nx.MultiDiGraph) -> int:
-    """Tel aantal nodes, exclusief dummy start nodes (__start_*)."""
+    """Count nodes, excluding dummy start nodes (__start_*)."""
     return sum(1 for node in G.nodes() if not str(node).startswith('__start_'))
 
 def count_real_edges(G: nx.MultiDiGraph) -> int:
-    """Tel aantal edges, exclusief edges van/naar dummy start nodes."""
+    """Count edges, excluding edges from/to dummy start nodes."""
     count = 0
     for u, v, key, data in G.edges(data=True, keys=True):
         if not str(u).startswith('__start_') and not str(v).startswith('__start_'):
@@ -48,29 +48,29 @@ def count_real_edges(G: nx.MultiDiGraph) -> int:
 
 @dataclass
 class BenchmarkResult:
-    """Metrics die voor beide varianten gemeten worden"""
+    """Metrics measured for all variants"""
     # Timing
     total_time: float
     
-    # Effectiviteit
+    # Effectiveness
     nodes_before: int
     nodes_after: int
     edges_before: int
     edges_after: int
     
-    # Kwaliteit
+    # Quality
     compression_ratio: float  # nodes_after / nodes_before
 
-    # Correctheid
-    language_preserved: bool  # Via random walk testing
-    determinism_check: bool   # Geen duplicate labels op RC nodes
+    # Correctness
+    language_preserved: bool  # Via targeted language preservation testing
+    determinism_check: bool   # No duplicate labels on nodes other than RC nodes
+
     # Details from language preservation testing
     language_mismatches: List[str]
 
 class BenchmarkSuite:
     """
-    Test beide varianten op identieke inputs.
-    Onafhankelijk van welke variant je kiest, deze data is nuttig.
+    Tests all variants on identical inputs.
     """
     
     def __init__(self):
@@ -81,24 +81,24 @@ class BenchmarkSuite:
         }
     
     def run_benchmark(self, graph: nx.MultiDiGraph, name: str, variant: str):
-        """Run één test voor één variant"""
+        """Run one test for one variant"""
         
-        start_total = time.time()
-        
-        # PRE-METRICS (exclusief dummy nodes)
+        # PRE-METRICS (excluding dummy nodes)
         nodes_before = count_real_nodes(graph)
         edges_before = count_real_edges(graph)
 
         factorize_fn = VARIANT_FACTORIZE[variant]
-        factored_graph = factorize_fn(graph.copy())
+        graph_copy = graph.copy()
 
+        start_total = time.time()
+        factored_graph = factorize_fn(graph_copy)
         total_time = time.time() - start_total
         
-        # POST-METRICS (exclusief dummy nodes)
+        # POST-METRICS (excluding dummy nodes)
         nodes_after = count_real_nodes(factored_graph)
         edges_after = count_real_edges(factored_graph)
         
-        # CORRECTHEIDSCHECK (zie functie hieronder)
+        # CORRECTNESS CHECK
         language_ok, mismatches = self.verify_language_preservation(graph, factored_graph)
         determinism_ok = self.verify_determinism(factored_graph)
         
@@ -145,73 +145,56 @@ class BenchmarkSuite:
         except Exception as e:
             print(f"⚠️  Error while running language preservation tests: {e}")
             return False, [f"Error running tests: {e}"]
-    
-    # def verify_determinism(self, G: nx.MultiDiGraph) -> bool:
-    #     """
-    #     Check dat er geen duplicate labels op RC nodes zijn.
-    #     Dit moet voor beide varianten gelden!
-    #     """
-    #     for node in G.nodes():
-    #         if 'RC' in str(node):  # Convert to string to handle different node types
-    #             labels = [d.get('label') for _, _, d in G.out_edges(node, data=True)]
-    #             if len(labels) != len(set(labels)):
-    #                 return False  # Duplicate gevonden!
-    #     return True
+        
     
     def verify_determinism(self, G: nx.MultiDiGraph) -> bool:
         """
-        Check dat er geen duplicate labels op non-RC nodes zijn.
-        RC nodes mogen visueel nondeterministisch lijken (dat is normaal in een gefactorde DFA).
-        Alle andere nodes mogen geen duplicate outgoing labels hebben.
+        Check that there are no duplicate labels on non-RC nodes.
+        RC nodes may appear visually non-deterministic (that is normal in a factored DFA).
+        All other nodes must not have duplicate outgoing labels.
         """
         for node in G.nodes():
-            if not 'RC' in str(node):  # Sla RC nodes over
+            if not 'RC' in str(node):  # Skip RC nodes
                 labels = [d.get('label') for _, _, d in G.out_edges(node, data=True)]
                 if len(labels) != len(set(labels)):
-                    return False  # Duplicate gevonden op niet-RC node!
+                    return False  # Duplicate found on non-RC node!
         return True
     
     def generate_comparison_report(self) -> str:
-        """Maak een vergelijkingsrapport tussen alle drie de varianten"""
+        """Create a comparison report between all three variants"""
         report = []
         report.append("=" * 80)
         report.append("BENCHMARK COMPARISON: NoEquivalenceClosure vs EquivalenceClosure vs NestedCalls")
         report.append("=" * 80)
 
-        has_nested = bool(self.results['NestedCalls'])
-
-        # Per testcase vergelijken
+        # Compare per test case
         for i, test_name in enumerate([r['graph_name'] for r in self.results['NoEquivalenceClosure']]):
             no_eq = self.results['NoEquivalenceClosure'][i]['result']
             eq = self.results['EquivalenceClosure'][i]['result']
-            nested = self.results['NestedCalls'][i]['result'] if has_nested and i < len(self.results['NestedCalls']) else None
+            nested = self.results['NestedCalls'][i]['result']
 
             report.append(f"\n📊 Test: {test_name}")
             report.append("-" * 80)
 
-            # SNELHEID
+            # SPEED
             report.append(f"\n⏱️  PERFORMANCE:")
             report.append(f"  NoEquiv:  {no_eq.total_time:.3f}s")
             report.append(f"  Equiv:    {eq.total_time:.3f}s")
-            if nested:
-                report.append(f"  Nested:   {nested.total_time:.3f}s")
+            report.append(f"  Nested:   {nested.total_time:.3f}s")
             speedup = no_eq.total_time / eq.total_time if eq.total_time > 0 else 0
             report.append(f"  → Speedup (NoEquiv/Equiv): {speedup:.2f}x {'🚀' if speedup > 1 else ''}")
 
-            # EFFECTIVITEIT
+            # EFFECTIVENESS
             report.append(f"\n📦 COMPRESSION:")
             report.append(f"  NoEquiv:  {no_eq.nodes_before} → {no_eq.nodes_after} nodes ({no_eq.compression_ratio:.1%})")
             report.append(f"  Equiv:    {eq.nodes_before} → {eq.nodes_after} nodes ({eq.compression_ratio:.1%})")
-            if nested:
-                report.append(f"  Nested:   {nested.nodes_before} → {nested.nodes_after} nodes ({nested.compression_ratio:.1%})")
+            report.append(f"  Nested:   {nested.nodes_before} → {nested.nodes_after} nodes ({nested.compression_ratio:.1%})")
 
-            ratios = {'NoEquiv': no_eq.compression_ratio, 'Equiv': eq.compression_ratio}
-            if nested:
-                ratios['Nested'] = nested.compression_ratio
+            ratios = {'NoEquiv': no_eq.compression_ratio, 'Equiv': eq.compression_ratio, 'Nested': nested.compression_ratio}
             best = max(ratios, key=ratios.get)
             report.append(f"  → Best compression: {best}")
 
-            # CORRECTHEID
+            # CORRECTNESS
             report.append(f"\n✅ CORRECTNESS:")
             report.append(f"  NoEquiv:  Language OK: {no_eq.language_preserved}, Determinism: {no_eq.determinism_check}")
             if not no_eq.language_preserved and no_eq.language_mismatches:
@@ -225,18 +208,17 @@ class BenchmarkSuite:
                 for m in eq.language_mismatches[:2]:
                     report.append(f"      - {m.splitlines()[3] if '\n' in m else m}")
 
-            if nested:
-                report.append(f"  Nested:   Language OK: {nested.language_preserved}, Determinism: {nested.determinism_check}")
-                if not nested.language_preserved and nested.language_mismatches:
-                    report.append(f"    → Mismatches (sample up to 2):")
-                    for m in nested.language_mismatches[:2]:
-                        report.append(f"      - {m.splitlines()[3] if '\n' in m else m}")
+            report.append(f"  Nested:   Language OK: {nested.language_preserved}, Determinism: {nested.determinism_check}")
+            if not nested.language_preserved and nested.language_mismatches:
+                report.append(f"    → Mismatches (sample up to 2):")
+                for m in nested.language_mismatches[:2]:
+                    report.append(f"      - {m.splitlines()[3] if '\n' in m else m}")
 
         return "\n".join(report)
     
     def save_results(self, filename: str = "benchmark_results.json"):
-        """Sla alle ruwe data op voor latere analyse"""
-        # Convert dataclasses to dict voor JSON serialization
+        """Save all raw data for later analysis"""
+        # Convert dataclasses to dict for JSON serialization
         json_data = {}
         for variant, results in self.results.items():
             json_data[variant] = []
@@ -259,24 +241,24 @@ class BenchmarkSuite:
 
 
 def load_graph(input_file: str) -> nx.MultiDiGraph:
-    """Laadt een DOT bestand in als een NetworkX MultiDiGraph."""
+    """Load a DOT file as a NetworkX MultiDiGraph."""
     try:
-        # nx_pydot.read_dot geeft een graph terug; we casten hem naar MultiDiGraph
+        # nx_pydot.read_dot returns a graph; we cast it to MultiDiGraph
         graph = nx.MultiDiGraph(nx.drawing.nx_pydot.read_dot(input_file))
         return graph
     except Exception as e:
-        print(f"❌ Fout bij inlezen bestand '{input_file}': {e}")
+        print(f"❌ Error reading file '{input_file}': {e}")
         raise
 
 
 def load_test_configs_from_directory(directory: str, label_prefix: str = "") -> List[Tuple[str, str]]:
     """
-    Laadt alle .dot files uit een directory als test configs.
-    Retourneert een list van (name, filepath) tuples.
+    Load all .dot files from a directory as test configs.
+    Returns a list of (name, filepath) tuples.
     """
     import glob
     
-    # Vind alle .dot files in de directory
+    # Find all .dot files in the directory
     dot_files = sorted(glob.glob(os.path.join(directory, "*.dot")))
     
     configs = []
@@ -285,7 +267,7 @@ def load_test_configs_from_directory(directory: str, label_prefix: str = "") -> 
         filename = os.path.basename(filepath)
         name = os.path.splitext(filename)[0]
         
-        # Voeg optioneel prefix toe
+        # Optionally add prefix
         if label_prefix:
             name = f"{label_prefix}_{name}"
         
@@ -294,22 +276,22 @@ def load_test_configs_from_directory(directory: str, label_prefix: str = "") -> 
     return configs
 
 
-# VOORBEELDGEBRUIK
+# EXAMPLE USAGE
 if __name__ == "__main__":
     suite = BenchmarkSuite()
     
     # ============================================
-    # TEST CONFIGURATIONS - KIES HIERONDER
+    # TEST CONFIGURATIONS - CHOOSE BELOW
     # ============================================
-    # Wijzig TEST_MODE om te switchen tussen test scenarios:
-    # - 'miscellaneous'    : Kleine, snelle testen (miscellaneous voorbeelden)
-    # - 'real_world'           : Grotere real-world voorbeelden (url_parser, etc.)
-    # - 'test_automata'   : Alle deel_*.dot files uit input/test_automata/
-    # - 'custom'          : Aangepaste list - voeg je eigen testen toe
-    TEST_MODE = 'real_world'  # ← WIJZIG DEZE LIJN
+    # Change TEST_MODE to switch between test scenarios:
+    # - 'miscellaneous'    : Small, fast tests (miscellaneous examples)
+    # - 'real_world'       : Larger real-world examples (url_parser, etc.)
+    # - 'test_automata'    : All deel_*.dot files from input/test_automata/
+    # - 'custom'           : Custom list - add your own tests here
+    TEST_MODE = 'real_world'  # ← CHANGE THIS LINE
     
     if TEST_MODE == 'miscellaneous':
-        # Kleine testcases voor snelle feedback
+        # Small test cases for quick feedback
         test_configs = [
             ("bigSmall", "/Users/milcokats/Projects/Compression Cyclic DFA/input/miscellaneous/bigSmall.dot"),
             ("differentEntries", "/Users/milcokats/Projects/Compression Cyclic DFA/input/miscellaneous/differentEntries.dot"),
@@ -317,38 +299,38 @@ if __name__ == "__main__":
             ("multipleExits2", "/Users/milcokats/Projects/Compression Cyclic DFA/input/miscellaneous/multipleExits2.dot"),
             ("commonState", "/Users/milcokats/Projects/Compression Cyclic DFA/input/miscellaneous/commonState.dot")
         ]
-        print("📊 Mode: QUICK (kleine testcases)")
+        print("📊 Mode: QUICK (small test cases)")
         
     elif TEST_MODE == 'real_world':
-        # Grotere real-world voorbeelden
+        # Larger real-world examples
         test_configs = [
             ("url-parser", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/url-parser.dot"),
             ("url-53", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/url-53-reduced-percent.dot"),
             ("url-170", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/url-170-reduced-https.dot"),
             ("url-271", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/url-271-reduced-ipv6-noslash.dot"),
             ("url-442", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/url-442-reduced-ipv6.dot"),
-            # Voeg hier meer grote files toe:
+            # Add more large files here:
             # ("other_large", "/path/to/other_large.dot"),
         ]
-        print("📊 Mode: REAL_WORLD (real-world voorbeelden)")
+        print("📊 Mode: REAL_WORLD (real-world examples)")
         
     elif TEST_MODE == 'test_automata':
-        # Alle test_automata voorbeelden (deel_1.dot t/m deel_11.dot)
+        # All test_automata examples (deel_1.dot to deel_11.dot)
         test_automata_dir = "/Users/milcokats/Projects/Compression Cyclic DFA/input/test_automata"
         test_configs = load_test_configs_from_directory(test_automata_dir)
         print("📊 Mode: TEST_AUTOMATA (deel_1.dot - deel_11.dot)")
         
     elif TEST_MODE == 'custom':
-        # Zelf je combinatie samenstellen
+        # Assemble your own combination
         test_configs = [
             ("bigSmall", "/Users/milcokats/Projects/Compression Cyclic DFA/input/miscellaneous/bigSmall.dot"),
             ("url_parser", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world_examples/url_parser.dot"),
-            # Voeg je test cases hier toe
+            # Add your test cases here
         ]
-        print("📊 Mode: CUSTOM (zelf samengesteld)")
+        print("📊 Mode: CUSTOM (custom selection)")
     
     else:
-        raise ValueError(f"Onbekende TEST_MODE: {TEST_MODE}")
+        raise ValueError(f"Unknown TEST_MODE: {TEST_MODE}")
     
     print(f"Tests: {len(test_configs)}")
     print("="*80)
@@ -360,11 +342,11 @@ if __name__ == "__main__":
         print('='*80)
         
         try:
-            # Laad de graaf
+            # Load the graph
             graph = load_graph(path)
             print(f"✓ Graph loaded: {graph.number_of_nodes()} nodes, {graph.number_of_edges()} edges")
             
-            # Run alle drie de varianten
+            # Run all three variants
             print("\n  Testing NoEquivalenceClosure...")
             result_no_eq = suite.run_benchmark(graph, name, 'NoEquivalenceClosure')
             print(f"  ✓ Completed: {result_no_eq.nodes_before} → {result_no_eq.nodes_after} nodes ({result_no_eq.compression_ratio:.1%})")
@@ -383,10 +365,10 @@ if __name__ == "__main__":
             traceback.print_exc()
             continue
     
-    # Genereer rapport aan het eind
+    # Generate report at the end
     if suite.results['NoEquivalenceClosure']:
         print("\n" + suite.generate_comparison_report())
         suite.save_results()
         print(f"\n✓ Results saved to benchmark_results.json")
     else:
-        print("\n⚠️  Geen resultaten om te rapporteren.")
+        print("\n⚠️  No results to report.")

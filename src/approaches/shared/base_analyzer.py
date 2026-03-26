@@ -1,17 +1,17 @@
 import networkx as nx
 from collections import deque
-from typing import Dict, Tuple, List, Optional, Set, Any
-from approaches.shared.shared_types import BlueprintEdge
+from typing import Dict, Tuple, List, Optional, Set
+
+from approaches.shared.shared_types import BlueprintEdge, SubstructureMatch
+from approaches.shared.shared_utils import get_internals_and_frontiers
+
 
 class BaseSubstructureAnalyzer:
     """
-    Gedeelde BFS-kern voor bisimilariteitsanalyse.
-
-    Subklassen implementeren:
-      - get_node_signature(node) → als de signatuur extra info nodig heeft (bv. accepting state)
-      - _build_match_output(...)  → bepaalt het returntype (SubstructureMatch of dict)
-
-    De volledige BFS-lus, validatie en blueprint-opbouw zitten hier en worden NIET overridden.
+    Shared BFS core for bisimilarity analysis.
+    Subclasses may extend __init__ (for example, to add EquivalenceClosure)
+    The full BFS loop, validation, blueprint construction, and match output all
+    live here and are not intended to be overridden.
     """
 
     def __init__(self, G: nx.MultiDiGraph, min_overlap: int = 2):
@@ -34,8 +34,9 @@ class BaseSubstructureAnalyzer:
 
     def _get_node_signature(self, node: str) -> tuple:
         """
-        Basisimplementatie: accepting op basis van 'shape' == 'doublecircle'.
-        Subklasse kan dit overriden om bv. ook 'accepting' attribuut mee te nemen.
+        Returns a tuple (is_accepting, sorted_edges) used to compare two nodes for bisimilarity.
+        Accepting is determined by 'shape' == 'doublecircle'.
+        A self-loop vs. non-self target produces a different signature.
         """
         if node not in self._sig_cache:
             is_accepting = self.G.nodes[node].get('shape') == 'doublecircle'
@@ -45,38 +46,65 @@ class BaseSubstructureAnalyzer:
         return self._sig_cache[node]
 
     # ------------------------------------------------------------------
-    # BFS-KERN  (gedeeld, niet te overriden)
+    # MATCH OUTPUT
     # ------------------------------------------------------------------
 
-    def _find_maximal_overlap(self, start_a: str, start_b: str) -> Optional[Any]:
+    def _build_match_output(self, start_a: str, start_b: str,
+                             matched_pairs: List[Tuple[str, str]],
+                             blueprint_edges: List[BlueprintEdge]) -> SubstructureMatch:
+        nodes_a = tuple(n1 for n1, _ in matched_pairs)
+        nodes_b = tuple(n2 for _, n2 in matched_pairs)
+
+        internals_a, frontiers_a = get_internals_and_frontiers(self, nodes_a)
+        internals_b, frontiers_b = get_internals_and_frontiers(self, nodes_b)
+
+        return SubstructureMatch(
+            start_nodes=(start_a, start_b),
+            overlap_size=len(matched_pairs),
+            internals_a=internals_a,
+            frontiers_a=frontiers_a,
+            internals_b=internals_b,
+            frontiers_b=frontiers_b,
+            all_pairs=frozenset(matched_pairs),
+            nodes_a_ordered=nodes_a,
+            nodes_b_ordered=nodes_b,
+            blueprint_edges=tuple(blueprint_edges),
+        )
+
+    # ------------------------------------------------------------------
+    # BFS CORE
+    # ------------------------------------------------------------------
+
+    def _find_maximal_overlap(self, start_a: str, start_b: str) -> Optional[SubstructureMatch]:
         if start_a == start_b:
             return None
 
         queue = deque([(start_a, start_b)])
-        visited_pairs: List[Tuple[str, str]] = []
-        pair_set: Set[Tuple[str, str]] = set()
-        pair_mapping: Dict[str, str] = {}   # a → b
-        reverse_mapping: Dict[str, str] = {}  # b → a
+        matched_pairs: List[Tuple[str, str]] = []
+        pair_mapping: Dict[str, str] = {}    # a → b
+        reverse_mapping: Dict[str, str] = {} # b → a
         nodes_in_a: Set[str] = set()
         nodes_in_b: Set[str] = set()
 
         while queue:
             n1, n2 = queue.popleft()
-            if (n1, n2) in pair_set:
+            # Skip pairs that reuse an already-matched node on either side.
+            if n1 in pair_mapping or n2 in reverse_mapping:
                 continue
+            # Reject identical nodes (self-pair).
             if n1 == n2:
                 continue
+            # Prevent crossing: a node from one side can't map into the other side's set.
             if n1 in nodes_in_b or n2 in nodes_in_a:
-                # return None -- overlap van structuren die zich op hetzelfde pad bevinden; ook indirecte overlap niet toestaan
-                # continue -- directe overlap afwijzen, indirecte overlap toestaan
                 return None
+            # Must have identical signatures to be comparable.
             if self._get_node_signature(n1) != self._get_node_signature(n2):
                 continue
 
             e1 = self._get_edges_cached(n1)
             e2 = self._get_edges_cached(n2)
 
-            # Inkomende validatie
+            # Incoming validation (part of partial isomorphism check))
             for pred_a in self.G.predecessors(n1):
                 if pred_a in pair_mapping:
                     pred_b = pair_mapping[pred_a]
@@ -91,7 +119,7 @@ class BaseSubstructureAnalyzer:
                         if target_b == n2 and self._get_edges_cached(pred_a).get(label) != n1:
                             return None
 
-            # Uitgaande validatie
+            # Outgoing validation: preserve labeled outgoing structure (part of partial isomorphism check).
             for label in set(e1.keys()) | set(e2.keys()):
                 t_a = e1.get(label)
                 t_b = e2.get(label)
@@ -102,13 +130,9 @@ class BaseSubstructureAnalyzer:
                 if is_internal_a:
                     if t_b != pair_mapping.get(t_a):
                         return None
-                else:
-                    if t_a is not None and t_b is not None and t_b in nodes_in_b:
-                        return None
 
-            # Accepteer paar
-            visited_pairs.append((n1, n2))
-            pair_set.add((n1, n2))
+            # Accept pair
+            matched_pairs.append((n1, n2))
             pair_mapping[n1] = n2
             reverse_mapping[n2] = n1
             nodes_in_a.add(n1)
@@ -118,26 +142,17 @@ class BaseSubstructureAnalyzer:
                 if label in e2:
                     queue.append((e1[label], e2[label]))
 
-        if len(visited_pairs) < self.min_overlap:
+        if len(matched_pairs) < self.min_overlap:
             return None
 
         # Blueprint edges
-        nodes_a = [p[0] for p in visited_pairs]
+        nodes_a = [p[0] for p in matched_pairs]
         node_to_idx = {node: i for i, node in enumerate(nodes_a)}
         blueprint_edges = list({
             BlueprintEdge(i, node_to_idx[t_a], label)
-            for i, (u_a, _) in enumerate(visited_pairs)
+            for i, (u_a, _) in enumerate(matched_pairs)
             for label, t_a in self._get_edges_cached(u_a).items()
             if t_a in node_to_idx
         })
 
-        return self._build_match_output(start_a, start_b, visited_pairs, blueprint_edges)
-
-    # ------------------------------------------------------------------
-    # ABSTRACT  (subklasse verplicht te implementeren)
-    # ------------------------------------------------------------------
-
-    def _build_match_output(self, start_a: str, start_b: str,
-                             visited_pairs: List[Tuple[str, str]],
-                             blueprint_edges: List[BlueprintEdge]) -> Any:
-        raise NotImplementedError
+        return self._build_match_output(start_a, start_b, matched_pairs, blueprint_edges)

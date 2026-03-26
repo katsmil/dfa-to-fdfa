@@ -1,5 +1,5 @@
 """
-Experimentele benaderingen voor DFA-compressie.
+Experimental approaches for DFA compression.
 
-Beschrijving van elke benadering: zie APPROACHES.md
+Description of each approach: see APPROACHES.md
 """
