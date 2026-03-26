@@ -23,10 +23,12 @@ Compression Cyclic DFA/
 │   ├── benchmark/
 │   │   └── benchmark.py                          # Variant-agnostic benchmark suite
 │   ├── language_preservation/
-│   │   └── run_validation.py                     # Validates language preservation across all variants
-│   └── tools/                                    # Standalone analysis utilities
+│   │   ├── run_validation.py                     # Validates language preservation across all variants
+│   │   ├── targeted_language_preservation.py     # Targeted test generator
+│   │   └── random_language_preservation.py       # Random test generator
 │
-├── output/                 # Generated factorized DOT files
+├── benchmark_results.json          # Benchmark output (generated)
+├── language_preservation_result.json # Language preservation output (generated)
 └── README.md
 ```
 
@@ -41,23 +43,35 @@ All three variants share the same base analysis and factorization infrastructure
 
 ## Usage
 
-The different components can be launched via the configurations in `launch.json`.
+Run the scripts directly from the repository root (there is no `launch.json` in the repo).
 
-1. Open `launch.json` in VS Code.
-2. Choose the configuration matching the desired variant.
-3. Run the configuration to execute the corresponding script.
+### Factorize a single DFA
+```bash
+python3 src/approaches/equivalence_closure/main.py input/miscellaneous/bigSmall.dot
+python3 src/approaches/no_equivalence_closure/main.py input/miscellaneous/bigSmall.dot
+python3 src/approaches/no_equivalence_closure_nested_calls/main.py input/miscellaneous/bigSmall.dot
+```
+
+Outputs are written to `output/` with suffixes `_EqClosure.dot`, `_NoEqClosure.dot`, and `_NESTED.dot`.
 
 ## Extra tools
 
 ### Language Preservation
-The script `src/language_preservation/run_validation.py` verifies that the factorized automaton accepts the same language as the original. Run it from the terminal:
+The script `src/language_preservation/run_validation.py` verifies that the factorized automaton accepts the same language as the original.
+
+Run all input subfolders:
+```bash
+python3 src/language_preservation/run_validation.py
+```
+
+Run specific subfolders:
 
 ```bash
 python3 src/language_preservation/run_validation.py real_world test_automata miscellaneous
 ```
 
 ### Benchmark
-The script `src/benchmark/benchmark.py` runs a variant-agnostic benchmark, testing all three variants on the same inputs and collecting metrics for compression ratio, runtime, and correctness. Configure the `TEST_MODE` variable at the bottom of the file to select the input set.
+The script `src/benchmark/benchmark.py` runs a variant-agnostic benchmark, testing all three variants on the same inputs and collecting metrics for compression ratio, runtime, and correctness. Configure the `TEST_MODE` variable at the bottom of the file to select the input set. Note: the current test lists inside `benchmark.py` use absolute paths — update them if your repo lives elsewhere.
 
 ---
 Folders such as `output/` contain generated files and are not relevant for running the project.
