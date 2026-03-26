@@ -5,7 +5,7 @@ Runs entirely in-process (no subprocesses) to avoid timeout issues.
 Usage:
   python3 src/language_preservation/run_validation.py                  → test all subfolders of input/
   python3 src/language_preservation/run_validation.py test_automata    → only that subfolder(s)
-  python3 src/language_preservation/run_validation.py miscellaneous real_world
+  python3 src/language_preservation/run_validation.py miscellaneous real_world → multiple subfolders
 """
 
 import sys
@@ -39,7 +39,7 @@ VARIANTS = [
 ]
 
 # ---------------------------------------------------------------------------
-# Welke subfolders testen?
+# What subfolders to test? By default, all. Or specify one or more as command-line arguments.
 # ---------------------------------------------------------------------------
 
 if len(sys.argv) > 1:

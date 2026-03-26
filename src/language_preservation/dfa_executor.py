@@ -14,9 +14,7 @@ Imported by:
 import copy
 import ast
 import networkx as nx
-from typing import List, Set, Tuple, Optional
-
-
+from typing import List, Set, Tuple, Optional, Callable
 
 # ---------------------------------------------------------------------------
 # Module-level graph helpers (also used by targeted_language_preservation.py)
@@ -53,7 +51,7 @@ def find_accepting_nodes(G: nx.MultiDiGraph) -> Set[str]:
 class DFAExecutor:
     """
     Executes strings on a (factored) DFA.
-    Supports both plain DFAs and DFAs with RC nodes and a call stack.
+    Supports both plain DFAs and FDFAs with RC nodes and a call stack.
     """
 
     def __init__(self, G: nx.MultiDiGraph):
@@ -68,24 +66,23 @@ class DFAExecutor:
     # Initialization helpers
     # ------------------------------------------------------------------
 
-    def _follow_epsilon_transitions(self, node: str) -> str:
-        """Follow epsilon transitions (unlabeled edges) until a node with labeled outgoing edges is reached."""
+    def _follow_epsilon_chain(self,
+                              node: str,
+                              stop_if: Callable[[str], bool]) -> str:
+        """Follow epsilon edges until stop_if holds, or no further epsilon edge exists."""
         visited = set()
         current = node
 
         while current not in visited:
             visited.add(current)
-            epsilon_target = None
-            has_labeled = False
+            if stop_if(current):
+                return current
 
+            epsilon_target = None
             for _, target, data in self.G.out_edges(current, data=True):
                 if 'label' not in data or data.get('label') is None:
                     epsilon_target = target
-                else:
-                    has_labeled = True
-
-            if has_labeled:
-                return current
+                    break
 
             if epsilon_target and epsilon_target not in visited:
                 current = epsilon_target
@@ -93,6 +90,16 @@ class DFAExecutor:
                 break
 
         return current
+
+    def _follow_epsilon_transitions(self, node: str) -> str:
+        """Follow epsilon transitions (unlabeled edges) until a node with labeled outgoing edges is reached."""
+        def has_labeled_outgoing(n: str) -> bool:
+            for _, _, data in self.G.out_edges(n, data=True):
+                if 'label' in data and data.get('label') is not None:
+                    return True
+            return False
+
+        return self._follow_epsilon_chain(node, stop_if=has_labeled_outgoing)
 
     def _find_start_node(self) -> str:
         """Find the start node (in-degree 0, or has a 'start' attribute)."""
@@ -166,7 +173,7 @@ class DFAExecutor:
         for symbol in input_string:
             # Chain nested calls: if current is an RC node (or lands on one after
             # entering a subcomponent), keep entering subcomponents until we reach a
-            # plain state that can take a normal transition.
+            # state that can take a normal transition.
             while 'RC' in str(current):
                 subcomponent_start = self._get_subcomponent_entry(current)
                 if subcomponent_start:
@@ -179,7 +186,7 @@ class DFAExecutor:
 
             if next_node is None:
                 if stack and self._is_frontier(current):
-                    # Pop through transparent RC frames (empty dispatch_map) until
+                    # Pop through RC frames (empty dispatch_map) until
                     # a frame can dispatch, or the stack is exhausted.
                     # An RC node with an empty dispatch is a "tail-call" node:
                     # the called subcomponent absorbed all continuation routing,
@@ -194,9 +201,10 @@ class DFAExecutor:
                             break
                         else:
                             trace.append(f"  (return through {rc_node})")
-                            # If the RC node itself is a frontier of its parent
-                            # subcomponent (peripheries=2), it becomes the new
-                            # current frontier point for the outer caller.
+                            # Dispatch failed on this RC frame, so unwind and keep going.
+                            # If this RC node is a frontier of the parent component,
+                            # update `current` so the next outer dispatch uses the
+                            # correct frontier context.
                             if self._is_frontier(rc_node):
                                 current = rc_node
 
@@ -290,27 +298,7 @@ class DFAExecutor:
 
     def _follow_epsilon_to_accepting(self, node: str) -> str:
         """Follow epsilon transitions until an accepting node is reached."""
-        visited = set()
-        current = node
-
-        while current not in visited:
-            visited.add(current)
-
-            if current in self.accepting_nodes:
-                return current
-
-            epsilon_target = None
-            for _, target, data in self.G.out_edges(current, data=True):
-                if 'label' not in data or data.get('label') is None:
-                    epsilon_target = target
-                    break
-
-            if epsilon_target and epsilon_target not in visited:
-                current = epsilon_target
-            else:
-                break
-
-        return current
+        return self._follow_epsilon_chain(node, stop_if=lambda n: n in self.accepting_nodes)
 
     # ------------------------------------------------------------------
     # Normalization

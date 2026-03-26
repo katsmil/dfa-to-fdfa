@@ -2,8 +2,8 @@
 VARIANT-AGNOSTIC BENCHMARK SUITE
 =================================
 
-This framework tests both variants (EquivalenceClosure and NoEquivalenceClosure)
-on the same inputs and collects objective metrics.
+This framework tests all variants (EquivalenceClosure, NoEquivalenceClosure, and NestedCalls)
+on the same inputs and collects metrics.
 """
 
 import time
@@ -48,7 +48,7 @@ def count_real_edges(G: nx.MultiDiGraph) -> int:
 
 @dataclass
 class BenchmarkResult:
-    """Metrics measured for both variants"""
+    """Metrics measured for all variants"""
     # Timing
     total_time: float
     
@@ -64,13 +64,13 @@ class BenchmarkResult:
     # Correctness
     language_preserved: bool  # Via random walk testing
     determinism_check: bool   # No duplicate labels on RC nodes
+
     # Details from language preservation testing
     language_mismatches: List[str]
 
 class BenchmarkSuite:
     """
-    Tests both variants on identical inputs.
-    Regardless of which variant you choose, this data is useful.
+    Tests all variants on identical inputs.
     """
     
     def __init__(self):
