@@ -9,7 +9,7 @@ on the same inputs and collects metrics.
 import time
 import networkx as nx
 from dataclasses import dataclass
-from typing import List, Dict, Tuple
+from typing import List, Tuple
 import json
 import sys
 import os
@@ -62,8 +62,8 @@ class BenchmarkResult:
     compression_ratio: float  # nodes_after / nodes_before
 
     # Correctness
-    language_preserved: bool  # Via random walk testing
-    determinism_check: bool   # No duplicate labels on RC nodes
+    language_preserved: bool  # Via targeted language preservation testing
+    determinism_check: bool   # No duplicate labels on nodes other than RC nodes
 
     # Details from language preservation testing
     language_mismatches: List[str]
@@ -83,15 +83,15 @@ class BenchmarkSuite:
     def run_benchmark(self, graph: nx.MultiDiGraph, name: str, variant: str):
         """Run one test for one variant"""
         
-        start_total = time.time()
-        
         # PRE-METRICS (excluding dummy nodes)
         nodes_before = count_real_nodes(graph)
         edges_before = count_real_edges(graph)
 
         factorize_fn = VARIANT_FACTORIZE[variant]
-        factored_graph = factorize_fn(graph.copy())
+        graph_copy = graph.copy()
 
+        start_total = time.time()
+        factored_graph = factorize_fn(graph_copy)
         total_time = time.time() - start_total
         
         # POST-METRICS (excluding dummy nodes)
@@ -167,13 +167,11 @@ class BenchmarkSuite:
         report.append("BENCHMARK COMPARISON: NoEquivalenceClosure vs EquivalenceClosure vs NestedCalls")
         report.append("=" * 80)
 
-        has_nested = bool(self.results['NestedCalls'])
-
         # Compare per test case
         for i, test_name in enumerate([r['graph_name'] for r in self.results['NoEquivalenceClosure']]):
             no_eq = self.results['NoEquivalenceClosure'][i]['result']
             eq = self.results['EquivalenceClosure'][i]['result']
-            nested = self.results['NestedCalls'][i]['result'] if has_nested and i < len(self.results['NestedCalls']) else None
+            nested = self.results['NestedCalls'][i]['result']
 
             report.append(f"\n📊 Test: {test_name}")
             report.append("-" * 80)
@@ -182,8 +180,7 @@ class BenchmarkSuite:
             report.append(f"\n⏱️  PERFORMANCE:")
             report.append(f"  NoEquiv:  {no_eq.total_time:.3f}s")
             report.append(f"  Equiv:    {eq.total_time:.3f}s")
-            if nested:
-                report.append(f"  Nested:   {nested.total_time:.3f}s")
+            report.append(f"  Nested:   {nested.total_time:.3f}s")
             speedup = no_eq.total_time / eq.total_time if eq.total_time > 0 else 0
             report.append(f"  → Speedup (NoEquiv/Equiv): {speedup:.2f}x {'🚀' if speedup > 1 else ''}")
 
@@ -191,12 +188,9 @@ class BenchmarkSuite:
             report.append(f"\n📦 COMPRESSION:")
             report.append(f"  NoEquiv:  {no_eq.nodes_before} → {no_eq.nodes_after} nodes ({no_eq.compression_ratio:.1%})")
             report.append(f"  Equiv:    {eq.nodes_before} → {eq.nodes_after} nodes ({eq.compression_ratio:.1%})")
-            if nested:
-                report.append(f"  Nested:   {nested.nodes_before} → {nested.nodes_after} nodes ({nested.compression_ratio:.1%})")
+            report.append(f"  Nested:   {nested.nodes_before} → {nested.nodes_after} nodes ({nested.compression_ratio:.1%})")
 
-            ratios = {'NoEquiv': no_eq.compression_ratio, 'Equiv': eq.compression_ratio}
-            if nested:
-                ratios['Nested'] = nested.compression_ratio
+            ratios = {'NoEquiv': no_eq.compression_ratio, 'Equiv': eq.compression_ratio, 'Nested': nested.compression_ratio}
             best = max(ratios, key=ratios.get)
             report.append(f"  → Best compression: {best}")
 
@@ -214,12 +208,11 @@ class BenchmarkSuite:
                 for m in eq.language_mismatches[:2]:
                     report.append(f"      - {m.splitlines()[3] if '\n' in m else m}")
 
-            if nested:
-                report.append(f"  Nested:   Language OK: {nested.language_preserved}, Determinism: {nested.determinism_check}")
-                if not nested.language_preserved and nested.language_mismatches:
-                    report.append(f"    → Mismatches (sample up to 2):")
-                    for m in nested.language_mismatches[:2]:
-                        report.append(f"      - {m.splitlines()[3] if '\n' in m else m}")
+            report.append(f"  Nested:   Language OK: {nested.language_preserved}, Determinism: {nested.determinism_check}")
+            if not nested.language_preserved and nested.language_mismatches:
+                report.append(f"    → Mismatches (sample up to 2):")
+                for m in nested.language_mismatches[:2]:
+                    report.append(f"      - {m.splitlines()[3] if '\n' in m else m}")
 
         return "\n".join(report)
     
