@@ -135,11 +135,22 @@ def _process_exits(G: nx.MultiDiGraph,
     )
 
     # Step 3: group symbols by (triggering frontiers, target)
+    #
+    # Example:
+    #   dispatch_map['i'] = {SUB_0_3: 16, SUB_0_4: 17}
+    # becomes two groups:
+    #   (frontiers={SUB_0_3}, target=16) -> ['i']
+    #   (frontiers={SUB_0_4}, target=17) -> ['i']
+    # which later yields two edges:
+    #   i [SUB_0_3] -> 16
+    #   i [SUB_0_4] -> 17
     groups: Dict[tuple, list] = defaultdict(list)
     for symbol, sub_to_target in dispatch_map.items():
-        triggering = frozenset(sub_to_target.keys())
-        target = next(iter(sub_to_target.values()))
-        groups[(triggering, target)].append(symbol)
+        target_to_frontiers: Dict[str, Set[str]] = defaultdict(set)
+        for sub_node, target in sub_to_target.items():
+            target_to_frontiers[target].add(sub_node)
+        for target, frontiers in target_to_frontiers.items():
+            groups[(frozenset(frontiers), target)].append(symbol)
 
     # Step 4: add edges — annotate only when a subset of frontiers triggers the transition
     for (triggering_frontiers, target), symbols in groups.items():
@@ -215,6 +226,7 @@ def _update_dispatch_maps(G: nx.MultiDiGraph,
     replaced by nodes from a new inner subcomponent: the callers of the outer
     subcomponent need their frontier-key references updated to the new SUB nodes.
     """
+    # Update dispatch_map targets + edges for RC nodes whose targets were factorised.
     for node in rc_nodes_with_dispatch:
         data = G.nodes[node]
         if 'dispatch_map' not in data:
@@ -248,8 +260,8 @@ def _update_dispatch_maps(G: nx.MultiDiGraph,
                                 G.add_edge(node, new_target,
                                            label=old_edge_label, key=k)
 
-    # Update dispatch_map KEYS for all RC nodes when blueprint frontier nodes were
-    # removed and replaced by nodes from a new inner subcomponent (second-run case).
+    # Second pass: frontier nodes inside SUB_* may be replaced by a new inner RC node.
+    # Update dispatch_map keys so outer RC nodes still point to the correct frontier.
     if frontier_key_replacements:
         for node, node_data in G.nodes(data=True):
             if 'dispatch_map' not in node_data:
