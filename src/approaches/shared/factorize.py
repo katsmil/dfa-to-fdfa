@@ -479,6 +479,16 @@ def apply_factorization(G: nx.MultiDiGraph,
 
 
 def save_dot(G: nx.MultiDiGraph, filename: str):
+    def _strip_wrapping_quotes(s: str) -> str:
+        if len(s) >= 2 and s[0] == s[-1] and s[0] in ('"', "'"):
+            return s[1:-1]
+        return s
+
+    def _prepare_label_for_pydot(s: str) -> str:
+        # Work around pydot's invalid escaping when input contains \".
+        # Using a literal quote lets pydot emit a valid escaped quote.
+        return s.replace(r'\"', '"')
+
     # 1. Create a temporary DiGraph for export
     export_G = nx.DiGraph()
 
@@ -505,7 +515,9 @@ def save_dot(G: nx.MultiDiGraph, filename: str):
         
         # Collect labels if they exist
         if 'label' in data:
-            edge_groups[(u, v)].append(str(data['label']).strip('"'))
+            raw = str(data['label'])
+            cleaned = _strip_wrapping_quotes(raw)
+            edge_groups[(u, v)].append(_prepare_label_for_pydot(cleaned))
         
         # Store remaining metadata (from the first edge we encounter)
         if (u, v) not in edge_metadata:
