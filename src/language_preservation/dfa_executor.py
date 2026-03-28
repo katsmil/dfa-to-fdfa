@@ -22,6 +22,12 @@ from typing import List, Set, Tuple, Optional, Callable
 
 def find_start_node(G: nx.MultiDiGraph) -> str:
     """Find the start node of a DFA graph (in-degree 0, or has a 'start' attribute)."""
+    # If '__start0' exists, use the node it points to as the start node
+    if '__start0' in G.nodes:
+        out_edges = list(G.out_edges('__start0'))
+        if out_edges:
+            # Take the target of the first outgoing edge from __start0
+            return out_edges[0][1]
     for node in G.nodes():
         if G.in_degree(node) == 0:
             return node
@@ -234,7 +240,7 @@ class DFAExecutor:
             trace.append(f"  CALL {current} (stack depth: {len(stack)}) [end-of-input]")
 
         current = self._follow_epsilon_to_accepting(current)
-
+        
         accepted = current in self.accepting_nodes
         trace.append(f"\nFinal: {current} ({'ACCEPT' if accepted else 'REJECT'})")
 
