@@ -163,6 +163,6 @@ total  = len(all_results)
 passed = sum(1 for r in all_results if all("✅" in r[i] for i in [2, 3, 4]))
 print()
 print("=" * len(SEP))
-print(f"  TOTAL: {total} files  |  ✅ all 3 OK: {passed}  |  ❌ at least 1 error: {total - passed}")
+print(f"  TOTAL: {total} files  |  ✅ compression OK: {passed}  |  ❌ compression ERROR: {total - passed}")
 print("=" * len(SEP))
 

@@ -309,6 +309,11 @@ if __name__ == "__main__":
             ("url-170", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/url-170-reduced-https.dot"),
             ("url-271", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/url-271-reduced-ipv6-noslash.dot"),
             ("url-442", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/url-442-reduced-ipv6.dot"),
+            ("rfc882address", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/rfc882address.dot"),
+            ("rfc959ftp", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/rfc959ftp.dot"),
+            ("rfc2373ipv6address", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/rfc2373ipv6address.dot"),
+            ("rfc3986uriReference", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/rfc3986uriReference.dot"),
+            ("wikiExamplePostalAddress", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/wikiExamplePostalAddress.dot"),
             # Add more large files here:
             # ("other_large", "/path/to/other_large.dot"),
         ]

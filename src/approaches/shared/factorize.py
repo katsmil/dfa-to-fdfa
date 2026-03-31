@@ -1,3 +1,5 @@
+import base64
+import json
 import networkx as nx
 from collections import defaultdict
 from typing import List, Set, Dict, Tuple, Optional
@@ -500,7 +502,14 @@ def save_dot(G: nx.MultiDiGraph, filename: str):
         clean_attrs = {}
         for k, v in data.items():
             if isinstance(v, dict):
-                clean_attrs[k] = str(v)
+                if k == 'dispatch_map':
+                    # Serialize dispatch_map robustly so it survives DOT escaping.
+                    json_str = json.dumps(v, ensure_ascii=True)
+                    clean_attrs['dispatch_map'] = base64.b64encode(
+                        json_str.encode('utf-8')
+                    ).decode('ascii')
+                else:
+                    clean_attrs[k] = str(v)
             elif v is not None:
                 clean_attrs[k] = str(v).strip('"')
         export_G.add_node(node, **clean_attrs)

@@ -11,10 +11,11 @@ Imported by:
   - targeted_language_preservation.py
 """
 
+import base64
 import copy
-import ast
+import json
 import networkx as nx
-from typing import List, Set, Tuple, Optional, Callable
+from typing import List, Set, Tuple, Optional, Callable, Dict, Any
 
 # ---------------------------------------------------------------------------
 # Module-level graph helpers (also used by targeted_language_preservation.py)
@@ -264,13 +265,7 @@ class DFAExecutor:
     def _dispatch(self, rc_node: str, frontier_node: str, symbol: str) -> Optional[str]:
         """δret(rc_node, frontier_node, symbol) → target."""
         nd = self.G.nodes.get(rc_node, {})
-        dispatch_map = nd.get('dispatch_map', {})
-
-        if isinstance(dispatch_map, str):
-            try:
-                dispatch_map = ast.literal_eval(dispatch_map)
-            except (ValueError, SyntaxError):
-                return None
+        dispatch_map = self._get_dispatch_map(nd)
 
         def strip_quotes(s: str) -> str:
             s = s.strip()
@@ -285,6 +280,52 @@ class DFAExecutor:
             return symbol_map.get(frontier_node)
 
         return None
+
+    def _get_dispatch_map(self, nd: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Retrieve the dispatch_map with caching:
+        - First call: decode the base64 string from dispatch_map into a dict.
+        - Store that dict on the node as `_dispatch_map_cache`.
+        - Subsequent calls: use the cached dict to avoid re-decoding.
+
+        Note: for in-memory graphs, `dispatch_map` may already be a dict;
+        in that case we cache it directly.
+        """
+        cached = nd.get('_dispatch_map_cache')
+        if isinstance(cached, dict):
+            return cached
+
+        dm: Dict[str, Any] = {}
+
+        raw = nd.get('dispatch_map')
+        if isinstance(raw, str) and raw.strip():
+            dm = self._decode_dispatch_map_b64(raw)
+        elif isinstance(raw, dict):
+            # In-memory graphs may still carry the dict directly.
+            dm = raw
+
+        nd['_dispatch_map_cache'] = dm
+        return dm
+
+    def _decode_dispatch_map_b64(self, raw: str) -> Dict[str, Any]:
+        raw = raw.strip()
+        try:
+            decoded = base64.b64decode(raw, validate=True).decode('utf-8')
+        except Exception:
+            return {}
+        try:
+            obj = json.loads(decoded)
+        except Exception:
+            return {}
+        if isinstance(obj, dict):
+            return obj
+        if isinstance(obj, str):
+            try:
+                obj2 = json.loads(obj)
+                return obj2 if isinstance(obj2, dict) else {}
+            except Exception:
+                return {}
+        return {}
 
     def _get_subcomponent_entry(self, rc_node: str) -> Optional[str]:
         """Find the entry node of the subcomponent associated with this RC node."""
