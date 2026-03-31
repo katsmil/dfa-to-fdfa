@@ -314,6 +314,12 @@ if __name__ == "__main__":
             ("rfc2373ipv6address", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/rfc2373ipv6address.dot"),
             ("rfc3986uriReference", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/rfc3986uriReference.dot"),
             ("wikiExamplePostalAddress", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/wikiExamplePostalAddress.dot"),
+            ("jsonLimited_0", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/jsonLimited_0.dot"),
+            ("jsonLimited_1", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/jsonLimited_1.dot"),
+            ("jsonLimited_2", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/jsonLimited_2.dot"),
+            ("jsonLimited_3", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/jsonLimited_3.dot"),
+            ("jsonLimited_4", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/jsonLimited_4.dot"),
+            ("jsonLimited_5", "/Users/milcokats/Projects/Compression Cyclic DFA/input/real_world/jsonLimited_5.dot"),
             # Add more large files here:
             # ("other_large", "/path/to/other_large.dot"),
         ]
