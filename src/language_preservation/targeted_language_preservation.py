@@ -30,6 +30,13 @@ from dfa_executor import DFAExecutor, find_start_node, find_accepting_nodes
 # Graph analysis helpers for the original DFA
 # ---------------------------------------------------------------------------
 
+def _strip_wrapping_quotes(label: str) -> str:
+    s = str(label).strip()
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in ('"', "'"):
+        return s[1:-1]
+    return s
+
+
 def _extract_labeled_transitions(G: nx.MultiDiGraph) -> Dict[str, Dict[str, str]]:
     """
     Build a transition table {node: {symbol: target}} for the original DFA.
@@ -42,8 +49,9 @@ def _extract_labeled_transitions(G: nx.MultiDiGraph) -> Dict[str, Dict[str, str]
         if not label:
             continue
         if isinstance(label, str):
-            # Strip surrounding quotes (pydot artifact)
-            label = label.strip().strip('"').strip("'")
+            # Strip a single pair of surrounding quotes (pydot artifact).
+            # This avoids stripping escaped quotes inside the label.
+            label = _strip_wrapping_quotes(label)
         for sym in [s.strip() for s in label.split(',')]:
             if sym:
                 table[u][sym] = v
