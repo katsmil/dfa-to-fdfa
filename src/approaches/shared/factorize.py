@@ -265,12 +265,42 @@ def _update_dispatch_maps(G: nx.MultiDiGraph,
     # Second pass: frontier nodes inside SUB_* may be replaced by a new inner RC node.
     # Update dispatch_map keys so outer RC nodes still point to the correct frontier.
     if frontier_key_replacements:
+        def _update_edge_frontier_labels(rc_node: str) -> None:
+            """Update frontier annotations in edge labels to match replaced keys."""
+            edges_to_update = []
+            for _, target, key, data in list(G.out_edges(rc_node, keys=True, data=True)):
+                raw_label = data.get('label')
+                if not raw_label:
+                    continue
+                label = _strip_label_quotes(raw_label)
+                if ' [' not in label or not label.endswith(']'):
+                    continue
+                symbol_part, frontier_part = label.split(' [', 1)
+                frontier_part = frontier_part[:-1]  # strip trailing ]
+                frontiers = [f.strip() for f in frontier_part.split(',') if f.strip()]
+                if not frontiers:
+                    continue
+                replaced = [frontier_key_replacements.get(f, f) for f in frontiers]
+                if replaced == frontiers:
+                    continue
+                new_frontier_str = ", ".join(sorted(replaced))
+                new_label = f"{symbol_part} [{new_frontier_str}]"
+                edges_to_update.append((rc_node, target, key, new_label, data))
+
+            for u, v, key, new_label, data in edges_to_update:
+                G.remove_edge(u, v, key=key)
+                new_data = dict(data)
+                new_data['label'] = new_label
+                if not G.has_edge(u, v, key=new_label):
+                    G.add_edge(u, v, key=new_label, **new_data)
+
         for node, node_data in G.nodes(data=True):
             if 'dispatch_map' not in node_data:
                 continue
             dm = node_data['dispatch_map']
             if not isinstance(dm, dict):
                 continue
+            node_had_key_swap = False
             for label, sub_to_target in list(dm.items()):
                 keys_to_swap = [
                     (old_k, frontier_key_replacements[old_k])
@@ -280,6 +310,10 @@ def _update_dispatch_maps(G: nx.MultiDiGraph,
                 for old_key, new_key in keys_to_swap:
                     target = sub_to_target.pop(old_key)
                     sub_to_target[new_key] = target
+                    node_had_key_swap = True
+
+            if node_had_key_swap:
+                _update_edge_frontier_labels(node)
 
 
 # ---------------------------------------------------------------------------
