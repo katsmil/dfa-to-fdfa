@@ -39,7 +39,10 @@ class BaseSubstructureAnalyzer:
         A self-loop vs. non-self target produces a different signature.
         """
         if node not in self._sig_cache:
-            is_accepting = self.G.nodes[node].get('shape') == 'doublecircle'
+            shape = self.G.nodes[node].get('shape', '')
+            if isinstance(shape, str):
+                shape = shape.strip('"')
+            is_accepting = shape == 'doublecircle'
             edges = self._get_edges_cached(node)
             sig_edges = sorted([(label, target == node) for label, target in edges.items()])
             self._sig_cache[node] = (is_accepting, tuple(sig_edges))
@@ -104,20 +107,32 @@ class BaseSubstructureAnalyzer:
             e1 = self._get_edges_cached(n1)
             e2 = self._get_edges_cached(n2)
 
-            # Incoming validation (part of partial isomorphism check))
+            pair_is_valid = True
+
+            # Incoming validation (part of partial isomorphism check).
             for pred_a in self.G.predecessors(n1):
                 if pred_a in pair_mapping:
                     pred_b = pair_mapping[pred_a]
                     for label, target_a in self._get_edges_cached(pred_a).items():
                         if target_a == n1 and self._get_edges_cached(pred_b).get(label) != n2:
-                            return None
+                            pair_is_valid = False
+                            break
+                if not pair_is_valid:
+                    break
+            if not pair_is_valid:
+                continue
 
             for pred_b in self.G.predecessors(n2):
                 if pred_b in reverse_mapping:
                     pred_a = reverse_mapping[pred_b]
                     for label, target_b in self._get_edges_cached(pred_b).items():
                         if target_b == n2 and self._get_edges_cached(pred_a).get(label) != n1:
-                            return None
+                            pair_is_valid = False
+                            break
+                if not pair_is_valid:
+                    break
+            if not pair_is_valid:
+                continue
 
             # Outgoing validation: preserve labeled outgoing structure (part of partial isomorphism check).
             for label in set(e1.keys()) | set(e2.keys()):
@@ -126,10 +141,14 @@ class BaseSubstructureAnalyzer:
                 is_internal_a = t_a is not None and t_a in nodes_in_a
                 is_internal_b = t_b is not None and t_b in nodes_in_b
                 if is_internal_a != is_internal_b:
-                    return None
+                    pair_is_valid = False
+                    break
                 if is_internal_a:
                     if t_b != pair_mapping.get(t_a):
-                        return None
+                        pair_is_valid = False
+                        break
+            if not pair_is_valid:
+                continue
 
             # Accept pair
             matched_pairs.append((n1, n2))
