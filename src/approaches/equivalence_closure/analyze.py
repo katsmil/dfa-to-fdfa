@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import List, Tuple, Set, Dict
 
 from approaches.shared.base_analyzer import BaseSubstructureAnalyzer
+from approaches.shared.factorize import _is_accepting_node
 from approaches.shared.shared_types import MatchLocation, BlueprintSubstructure, SubstructureMatch
 
 from approaches.shared.shared_utils import build_signature_buckets
@@ -69,25 +70,30 @@ class SubstructureAnalyzer(BaseSubstructureAnalyzer):
 # AGGREGATION & PRIORITIZATION
 # ---------------------------------------------------------------------------
 
-def _aggregate_blueprint_results(matches: List[SubstructureMatch]) -> List[BlueprintSubstructure]:
+def _aggregate_blueprint_results(matches: List[SubstructureMatch], analyzer: BaseSubstructureAnalyzer) -> List[BlueprintSubstructure]:
     """
     Combine raw pairwise matches into unique BlueprintSubstructure objects.
     Deduplicate locations that map to the same set of nodes.
     """
     structure_registry: Dict[tuple, List[SubstructureMatch]] = defaultdict(list)
 
-    # Group raw matches by identical blueprint structure.
+    # Group raw matches by identical blueprint structure and accepting profile.
     for m in matches:
         # Use the blueprint edge set as a stable key for identical structures.
         edges_tuple = tuple(sorted(
             (e.source_idx, e.target_idx, e.label) for e in m.blueprint_edges
         ))
-        structure_registry[edges_tuple].append(m)
+        acceptance_tuple = tuple(
+            _is_accepting_node(analyzer.G, n)
+            for n in m.nodes_a_ordered
+        )
+        key = (edges_tuple, acceptance_tuple)
+        structure_registry[key].append(m)
 
     final_results = []
 
     # For each unique structure, collect all concrete locations where it occurs.
-    for edges_tuple, related_matches in structure_registry.items():
+    for key, related_matches in structure_registry.items():
         first_m = related_matches[0]
         seen_location_keys: Set[tuple] = set()
         locations: List[MatchLocation] = []
@@ -178,4 +184,4 @@ def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[BlueprintSubstru
                     raw_results.append(match)
 
     # Aggregate duplicate structures and prioritize by estimated savings.
-    return _prioritize_candidates(_aggregate_blueprint_results(raw_results))
+    return _prioritize_candidates(_aggregate_blueprint_results(raw_results, analyzer))

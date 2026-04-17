@@ -3,6 +3,7 @@ from collections import defaultdict
 from typing import List, Tuple, Dict, Set
 
 from approaches.shared.base_analyzer import BaseSubstructureAnalyzer
+from approaches.shared.factorize import _is_accepting_node
 from approaches.shared.shared_types import MatchLocation, BlueprintSubstructure, BlueprintEdge, SubstructureMatch
 from approaches.shared.shared_utils import count_non_overlapping_locations, build_signature_buckets
 
@@ -48,15 +49,20 @@ def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[BlueprintSubstru
                     (e.source_idx, e.target_idx, e.label)
                     for e in match.blueprint_edges
                 ))
+                acceptance_tuple = tuple(
+                    _is_accepting_node(analyzer.G, n)
+                    for n in match.nodes_a_ordered
+                )
+                key = (edges_tuple, acceptance_tuple)
 
                 # Add both A- and B-side locations to the registry for this blueprint
-                structure_registry[edges_tuple].add(MatchLocation(
+                structure_registry[key].add(MatchLocation(
                     start_node=match.start_nodes[0],
                     all_nodes=match.nodes_a_ordered,
                     internals=match.internals_a,
                     frontiers=match.frontiers_a,
                 ))
-                structure_registry[edges_tuple].add(MatchLocation(
+                structure_registry[key].add(MatchLocation(
                     start_node=match.start_nodes[1],
                     all_nodes=match.nodes_b_ordered,
                     internals=match.internals_b,
@@ -64,19 +70,19 @@ def run_analysis(G: nx.MultiDiGraph, min_size: int = 2) -> List[BlueprintSubstru
                 ))
 
                 # Store the blueprint structure and node order (only once per blueprint)
-                if edges_tuple not in blueprint_store:
-                    blueprint_store[edges_tuple] = match.blueprint_edges
-                    blueprint_nodes_store[edges_tuple] = match.nodes_a_ordered
+                if key not in blueprint_store:
+                    blueprint_store[key] = match.blueprint_edges
+                    blueprint_nodes_store[key] = match.nodes_a_ordered
 
     results = []
     # Build BlueprintSubstructure objects for each unique blueprint
-    for edges_tuple, locations in structure_registry.items():
+    for key, locations in structure_registry.items():
         loc_tuple = tuple(locations)
         results.append(BlueprintSubstructure(
-            blueprint_nodes=blueprint_nodes_store[edges_tuple],
+            blueprint_nodes=blueprint_nodes_store[key],
             overlap_size=len(loc_tuple[0].all_nodes),
             locations=loc_tuple,
-            blueprint_edges=blueprint_store[edges_tuple],
+            blueprint_edges=blueprint_store[key],
         ))
 
     eff = count_non_overlapping_locations
