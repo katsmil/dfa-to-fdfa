@@ -19,9 +19,20 @@ def factorize(G: nx.MultiDiGraph) -> nx.MultiDiGraph:
     results = run_analysis(G)
     G = apply_factorization(G, results)
 
-    # Pass 2
-    sub_nodes = [n for n in G.nodes() if str(n).startswith('SUB_')]
-    if sub_nodes:
+    # Pass 2 — nested factorisation should stay within the same outer subroutine
+    # cluster. Factoring all SUB_* nodes globally can merge repeated patterns from
+    # different call contexts and break acceptance semantics for nested calls.
+    sub_nodes_by_cluster = {}
+    for n, data in G.nodes(data=True):
+        if str(n).startswith('SUB_'):
+            cluster = data.get('cluster')
+            sub_nodes_by_cluster.setdefault(cluster, []).append(n)
+
+    for cluster, sub_nodes in sub_nodes_by_cluster.items():
+        # A cluster must contain at least two SUB instances to be worth
+        # analyzing for repeated patterns. Single-node clusters cannot compress.
+        if len(sub_nodes) < 2:
+            continue
         G_sub = nx.MultiDiGraph(G.subgraph(sub_nodes))
         results2 = run_analysis(G_sub)
         if results2:
